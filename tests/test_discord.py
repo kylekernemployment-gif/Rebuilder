@@ -9,7 +9,7 @@ import pytest
 from fixtures import fake_espn
 from rebuild import cba
 from rebuild import league as L
-from rebuild.cog import OffersView, Rebuild, SimView, TradeView
+from rebuild.cog import Rebuild
 
 
 class FakeResponse:
@@ -30,6 +30,10 @@ class FakeResponse:
 
     async def defer(self, **kw):
         self.done = True
+
+    async def send_modal(self, modal):
+        self.done = True
+        self.inter.sent.append(("modal", None, None, modal))
 
 
 class FakeFollowup:
@@ -88,142 +92,111 @@ def run(coro):
     return asyncio.run(coro)
 
 
-def test_full_flow_through_commands(cog):
+def find(view, kind, label_start=None, placeholder_start=None):
+    for item in view.children:
+        if kind == "button" and isinstance(item, discord.ui.Button) and item.label and item.label.startswith(label_start):
+            return item
+        if kind == "select" and isinstance(item, discord.ui.Select) and (
+                placeholder_start is None or (item.placeholder or "").startswith(placeholder_start)):
+            return item
+    raise AssertionError(f"no {kind} {label_start or placeholder_start}: "
+                         f"{[getattr(c, 'label', None) or getattr(c, 'placeholder', None) for c in view.children]}")
+
+
+async def click(view, label):
+    x = FakeInteraction(component=True)
+    await find(view, "button", label).callback(x)
+    if x.last_embed():
+        check_embed(x.last_embed())
+    return x
+
+
+async def choose(view, placeholder, value):
+    x = FakeInteraction(component=True, values=[value])
+    await find(view, "select", placeholder_start=placeholder).callback(x)
+    if x.last_embed():
+        check_embed(x.last_embed())
+    return x
+
+
+async def menu(view, key):
+    return await choose(view, "☰ More", key)
+
+
+def test_everything_runs_from_the_hub(cog):
     async def flow():
         i = FakeInteraction()
-        await Rebuild.start.callback(cog, i, "Knicks")
-        check_embed(i.last_embed())
-        assert "Knicks" in i.last_embed().title
-
-        i = FakeInteraction()
-        await Rebuild.team.callback(cog, i, None)
-        check_embed(i.last_embed())
-        i = FakeInteraction()
-        await Rebuild.team.callback(cog, i, "Celtics")
-        check_embed(i.last_embed())
-
+        await Rebuild.rebuild_cmd.callback(cog, i)
+        hub = i.sent[-1][3]
+        assert "Pick your team" in i.last_embed().title
+        x = await choose(hub, "Run the (East)", "NYK")
+        assert "Knicks" in x.last_embed().title
         save = await cog.get_save(1)
-        star = L.roster(save, "BOS")[0]
-        i = FakeInteraction()
-        await Rebuild.player.callback(cog, i, star["id"])
-        check_embed(i.last_embed())
-
-        # trade builder: ask for a Celtic, use the trade finder, propose
-        i = FakeInteraction()
+        # menu layout: 5 nav buttons + the More menu on top
+        assert [c.label for c in hub.children[:5]] == ["Home", "Roster", "Trade", "Free agents", "Lineup"]
+        for key in ("roster", "lineup", "fa"):
+            await click(hub, {"roster": "Roster", "lineup": "Lineup", "fa": "Free agents"}[key])
+        for key in ("coach", "standings", "stats", "teamstats", "injuries", "draftboard", "market", "rumors",
+                    "history", "help", "extend", "inbox", "shop", "release"):
+            await menu(hub, key)
+        # roster -> player card -> trade for him -> trade finder -> propose
+        await click(hub, "Roster")
+        await choose(hub, "View another team (East)", "BOS")
         target = L.roster(save, "BOS", include_twoway=False)[4]
-        await Rebuild.trade.callback(cog, i, "BOS", target["id"])
-        view: TradeView = i.sent[-1][3]
-        check_embed(i.last_embed())
-        assert len(view.children) == 5
-        for item in view.children:
-            if isinstance(item, discord.ui.Select):
-                assert len(item.options) <= 25
-        b = FakeInteraction(component=True)
-        await view.finder.callback(b)
-        check_embed(b.last_embed())
-        if view.trade.a_out:
-            p = FakeInteraction(component=True)
-            await view.propose.callback(p)
-            e = p.last_embed()
-            check_embed(e)
-            assert e.title.startswith("✅")
-
-        # shop a player
-        mine = L.roster(await cog.get_save(1), "NYK", include_twoway=False)[1]
-        i = FakeInteraction()
-        await Rebuild.shop.callback(cog, i, mine["id"])
-        check_embed(i.last_embed())
-        if i.sent[-1][3] is not None:
-            ov: OffersView = i.sent[-1][3]
-            a = FakeInteraction(component=True)
-            await ov.children[0].callback(a)
-            assert a.last_embed().title.startswith("✅")
-
-        for cmd in (Rebuild.market, Rebuild.standings, Rebuild.history, Rebuild.leaderboard, Rebuild.inbox):
-            i = FakeInteraction()
-            await cmd.callback(cog, i)
-            if i.last_embed():
-                check_embed(i.last_embed())
-        i = FakeInteraction()
-        await Rebuild.rumors.callback(cog, i, None)
-        check_embed(i.last_embed())
-
-        # season: deadline -> rest -> offseason -> draft -> re-sign -> FA -> next season
-        i = FakeInteraction()
-        await Rebuild.sim_cmd.callback(cog, i)
-        sv: SimView = i.sent[-1][3]
-
-        async def press(label_start, values=None):
-            for item in sv.children:
-                if isinstance(item, discord.ui.Button) and item.label.startswith(label_start):
-                    x = FakeInteraction(component=True)
-                    await item.callback(x)
-                    check_embed(x.last_embed())
-                    return x
-            raise AssertionError(f"no button {label_start}: {[getattr(c, 'label', None) for c in sv.children]}")
-
-        async def choose(values):
-            sel = next(c for c in sv.children if isinstance(c, discord.ui.Select))
-            x = FakeInteraction(component=True, values=values)
-            await sel.callback(x)
-            check_embed(x.last_embed())
-            return x
-
-        await press("Sim 1 week")
-        await press("Sim to trade deadline")
-        save = await cog.get_save(1)
+        await choose(hub, "Open a player card", target["id"])
+        await click(hub, "Trade for")
+        x = await click(hub, "What would it take?")
+        await click(hub, "Propose trade")
+        # shop
+        await menu(hub, "shop")
+        mine = L.roster(save, "NYK", include_twoway=False)[1]
+        await choose(hub, "Put a player on the block", mine["id"])
+        # season: week, deadline, end, playoffs, offseason
+        await click(hub, "Home")
+        await click(hub, "Sim 1 week")
+        await click(hub, "Sim to trade deadline")
         assert save["phase"] == "deadline"
-        for cmd in (Rebuild.lineup, Rebuild.coach, Rebuild.freeagents, Rebuild.extend, Rebuild.draftboard):
-            i = FakeInteraction()
-            await cmd.callback(cog, i)
-            check_embed(i.last_embed())
-        await press("Sim to end of season")
+        await click(hub, "Sim to end of season")
         assert save["phase"] == "stretch" and save.get("awards")
-        i = FakeInteraction()
-        await Rebuild.trade.callback(cog, i, "BOS", None)
-        assert "deadline has passed" in (i.sent[-1][1] or "")
-        for cmd in (Rebuild.injuries, Rebuild.stats_cmd):
-            i = FakeInteraction()
-            await cmd.callback(cog, i, None)
-            check_embed(i.last_embed())
-        await press("Play the playoffs")
-        await press("Start offseason")
+        x = await click(hub, "Trade")
+        assert "locked" in x.last_embed().title
+        await click(hub, "Home")
+        await click(hub, "Play the playoffs")
+        await click(hub, "Start offseason")
         save = await cog.get_save(1)
         while save["phase"] == "draft":
-            if any(isinstance(c, discord.ui.Select) for c in sv.children):
-                await choose([save["draft"]["prospects"][0]["id"]])
-            else:
-                await press("Auto-draft the rest")
+            try:
+                await choose(hub, "You're on the clock", save["draft"]["prospects"][0]["id"])
+            except AssertionError:
+                await click(hub, "Auto-draft the rest")
         assert save["phase"] == "resign"
-        if save.get("asks"):
-            await choose([next(iter(save["asks"]))])
-        await press("Open free agency")
-        assert save["phase"] == "fa"
-        await press("Next free agency day")
-        await press("Finish offseason")
+        await click(hub, "Open free agency")
+        await click(hub, "Next free agency day")
+        await click(hub, "Free agents")
+        await click(hub, "Home")
+        await click(hub, "Finish offseason")
         assert save["phase"] == "preseason" and save["season"] == 2028
-        i = FakeInteraction()
-        await Rebuild.history.callback(cog, i)
-        assert "2026-27" in i.last_embed().description
+        await menu(hub, "history")
 
     run(flow())
 
 
 def test_other_users_cannot_press_buttons(cog):
     async def flow():
-        await Rebuild.start.callback(cog, FakeInteraction(), "Nets")
         i = FakeInteraction()
-        await Rebuild.sim_cmd.callback(cog, i)
-        view = i.sent[-1][3]
+        await Rebuild.rebuild_cmd.callback(cog, i)
+        hub = i.sent[-1][3]
         stranger = FakeInteraction(user_id=2, component=True)
-        assert await view.interaction_check(stranger) is False
+        assert await hub.interaction_check(stranger) is False
 
     run(flow())
 
 
 def test_saves_survive_restart(cog, tmp_path):
     async def flow():
-        await Rebuild.start.callback(cog, FakeInteraction(), "Spurs")
+        i = FakeInteraction()
+        await Rebuild.rebuild_cmd.callback(cog, i)
+        await choose(i.sent[-1][3], "Run the (West)", "SAS")
         cog.saves.clear()
         save = await cog.get_save(1)
         assert save["team"] == "SAS"

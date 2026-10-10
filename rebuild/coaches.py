@@ -45,14 +45,15 @@ def coach(save: dict, abbr: str) -> dict | None:
 
 
 def team_bonus(save: dict, abbr: str) -> float:
-    """Rotation-strength points a coach is worth (roughly -1 to +1.7, about -4 to +6 wins)."""
+    """Rotation-strength points a coach is worth: a nudge, not a game-changer. The best coaches
+    are worth roughly +2 to +3 wins over an average one, a weak or interim coach about -1 to -2."""
     c = coach(save, abbr)
-    return (rating(c) - 78) * 0.12 if c else -0.6
+    return (rating(c) - 78) * 0.055 if c else -0.3
 
 
 def dev_bonus(save: dict, abbr: str | None) -> float:
     c = coach(save, abbr) if abbr else None
-    return (c["dev"] - 78) / 12 if c else 0.0
+    return (c["dev"] - 78) / 25 if c else 0.0   # about +/-0.5 OVR a year for young players
 
 
 def available(save: dict) -> list[dict]:
