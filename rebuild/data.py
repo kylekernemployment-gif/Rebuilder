@@ -19,8 +19,19 @@ from .ratings import rate_league
 log = logging.getLogger("rebuild.data")
 
 ROSTER_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{tid}/roster"
+# Fallbacks if the main roster endpoint refuses us (same data, different ESPN routes).
+ROSTER_FALLBACKS = [
+    "https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{tid}/roster",
+    "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{tid}?enable=roster",
+]
 STATS_URL = "https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/statistics/byathlete"
-HEADERS = {"User-Agent": "Mozilla/5.0 (RebuildBot; Discord NBA sim)"}
+# ESPN rejects requests that don't look like a normal browser (same headers PC Pick Em' uses).
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+}
 
 STAT_KEYS = {
     "gamesPlayed": "gp", "avgMinutes": "mpg", "avgRebounds": "reb", "avgFouls": "pf",
@@ -165,16 +176,30 @@ def build_league(rosters: dict[str, list[dict]], stats: dict[int, dict[str, dict
 # Network
 # ------------------------------------------------------------------------------------------
 
-async def _get(session: aiohttp.ClientSession, url: str, params: dict | None = None) -> Any:
-    for attempt in range(3):
+async def _get(session: aiohttp.ClientSession, url: str, params: dict | None = None, tries: int = 3) -> Any:
+    for attempt in range(tries):
         try:
             async with session.get(url, params=params, headers=HEADERS) as r:
                 if r.status == 200:
                     return await r.json(content_type=None)
                 log.warning("ESPN %s -> HTTP %s", url, r.status)
+                if r.status in (403, 404):
+                    return None  # blocked or missing: retrying the same URL won't help
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             log.warning("ESPN %s failed: %r", url, e)
         await asyncio.sleep(1.5 * (attempt + 1))
+    return None
+
+
+async def fetch_roster(session: aiohttp.ClientSession, tid: int) -> dict | None:
+    for url in [ROSTER_URL] + ROSTER_FALLBACKS:
+        data = await _get(session, url.format(tid=tid))
+        if data:
+            team = data.get("team") if isinstance(data.get("team"), dict) else None
+            if team and "athletes" in team and "athletes" not in data:
+                data = team
+            if data.get("athletes"):
+                return data
     return None
 
 
@@ -202,11 +227,12 @@ async def fetch_stats(session: aiohttp.ClientSession, year: int) -> dict[str, di
 async def fetch_league(session: aiohttp.ClientSession) -> dict | None:
     season = current_season()
     rosters: dict[str, list[dict]] = {}
-    sem = asyncio.Semaphore(6)
+    sem = asyncio.Semaphore(3)
 
     async def one(abbr: str, tid: int) -> None:
         async with sem:
-            data = await _get(session, ROSTER_URL.format(tid=tid))
+            data = await fetch_roster(session, tid)
+            await asyncio.sleep(0.3)
         if data:
             rosters[abbr] = parse_roster(data, abbr, season)
 

@@ -33,7 +33,12 @@ log = logging.getLogger("rebuild.rumors")
 REALGM_RSS = "https://basketball.realgm.com/rss/wiretap/0/0.xml"
 ESPN_NEWS = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/news?limit=50"
 REDDIT_RSS = "https://www.reddit.com/r/nba/new/.rss?limit=100"
-HEADERS = {"User-Agent": "Mozilla/5.0 (RebuildBot NBA rumor reader)"}
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml,application/json;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
 
 TIER_WEIGHT = {1: 1.0, 2: 0.65, 3: 0.35, 4: 0.12}
 TIER_BADGE = {1: "✅ Tier 1 insider", 2: "☑️ Established reporter", 3: "📰 Outlet report", 4: "▫️ Unconfirmed"}

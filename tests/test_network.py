@@ -40,8 +40,11 @@ def test_fetch_league_and_rumors_against_fake_server(monkeypatch):
     async def flow():
         app = web.Application()
 
-        async def roster(req):
-            return web.json_response(roster_json(int(req.match_info["tid"])))
+        async def blocked(_):
+            return web.Response(status=403)
+
+        async def roster(req):  # the ?enable=roster route wraps athletes in "team"
+            return web.json_response({"team": roster_json(int(req.match_info["tid"]))})
 
         async def stats(req):
             return web.json_response(stats_page(int(req.query.get("page", 1))))
@@ -56,7 +59,8 @@ def test_fetch_league_and_rumors_against_fake_server(monkeypatch):
         async def reddit(_):
             return web.Response(status=429)
 
-        app.router.add_get("/roster/{tid}", roster)
+        app.router.add_get("/roster/{tid}", blocked)
+        app.router.add_get("/team/{tid}", roster)
         app.router.add_get("/stats", stats)
         app.router.add_get("/rss", rss)
         app.router.add_get("/news", espn_news)
@@ -68,6 +72,7 @@ def test_fetch_league_and_rumors_against_fake_server(monkeypatch):
         port = site._server.sockets[0].getsockname()[1]
         base = f"http://127.0.0.1:{port}"
         monkeypatch.setattr(data, "ROSTER_URL", base + "/roster/{tid}")
+        monkeypatch.setattr(data, "ROSTER_FALLBACKS", [base + "/team/{tid}?enable=roster"])
         monkeypatch.setattr(data, "STATS_URL", base + "/stats")
         monkeypatch.setattr(rumors, "REALGM_RSS", base + "/rss")
         monkeypatch.setattr(rumors, "ESPN_NEWS", base + "/news")
