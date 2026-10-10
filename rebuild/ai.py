@@ -81,34 +81,56 @@ def mode_of(save: dict, abbr: str) -> str:
 # Valuation
 # ------------------------------------------------------------------------------------------
 
-def effective_ovr(p: dict, mode: str) -> float:
+def upside(p: dict) -> float:
+    """What a young player projects to become (top picks and high-potential kids carry real value)."""
     ovr, pot, age = p["ovr"], p.get("pot", p["ovr"]), p["age"]
-    decline = max(0, age - 30)
+    if age > 25:
+        return ovr
+    # The further away the ceiling, the more it's discounted for risk.
+    return max(ovr, pot - 0.45 * max(0, pot - ovr) * (0.6 if age <= 21 else 0.8))
+
+
+def effective_ovr(p: dict, mode: str) -> float:
+    ovr, age = p["ovr"], p["age"]
+    now = ovr - 0.9 * max(0, age - 30)          # vets decline: 31+ lose value every year
+    up = upside(p)
     if mode == "contend":
-        e = ovr + 0.1 * (pot - ovr) - 0.5 * decline
+        e = 0.75 * now + 0.25 * max(now, up)
     elif mode == "rebuild":
-        e = 0.4 * ovr + 0.6 * pot - 1.3 * max(0, age - 26)
+        e = 0.3 * now + 0.7 * max(now, up) - 1.4 * max(0, age - 27)
     else:
-        e = 0.75 * ovr + 0.25 * pot - 0.8 * decline
+        e = 0.55 * now + 0.45 * max(now, up) - 0.5 * max(0, age - 30)
     if p.get("out", 0) > 40:
         e -= 2.5
     return e
 
 
-def player_value(p: dict, mode: str, season: int) -> float:
+def player_value(p: dict, mode: str, season: int, cap_room: bool = False) -> float:
+    """Trade value to a team in `mode`. Bad money counts against a player in full, unless the team
+    has cap room to absorb it (that's how salary dumps work: a team with space takes the contract
+    if it's paid in picks or young players)."""
     if p.get("twoway"):
         return max(2.0, curve_value(effective_ovr(p, mode)) * 0.5)
     e = effective_ovr(p, mode)
     base = curve_value(e)
-    k = {"contend": 2.4, "middle": 3.0, "rebuild": 3.6}[mode]
+    if p["age"] <= 22 and p.get("pot", 0) >= 85:
+        base *= 1.15                              # blue-chip prospect premium
+    dur = p.get("dur", 0.85)
+    base *= max(0.82, min(1.03, 0.8 + 0.2 * dur / 0.85))   # injury-prone players are worth a bit less
+    k = {"contend": 1.6, "middle": 2.0, "rebuild": 2.4}[mode]
     contract = 0.0
     for i, sal in enumerate(p.get("salary") or []):
-        proj = e - (max(0, p["age"] + i - 30) * 1.2) + (min(i, 3) * 1.2 if p["age"] + i <= 24 else 0)
+        proj = p["ovr"] - (max(0, p["age"] + i - 29) * 1.5) + (min(i, 4) * 1.5 if p["age"] + i <= 24 else 0)
+        if p["age"] + i <= 25:
+            proj = max(proj, min(upside(p), p["ovr"] + 2.5 * (i + 1)))
         surplus_m = (market_salary(proj, season + i) - sal) / 1_000_000
-        contract += surplus_m * k * (0.85 ** i)
-    if contract < 0:
-        contract *= 1.15 if mode == "rebuild" else 1.0
-    return max(-450.0, base + contract)
+        w = k * (0.85 ** i)
+        if surplus_m < 0:
+            w *= 1.45                             # overpaid contracts are hard to move
+            if cap_room and i == 0:
+                w *= 0.45                         # ...unless you have unused space this season
+        contract += surplus_m * w
+    return max(-600.0, base + contract)
 
 
 def expected_slot(save: dict, k: dict) -> float:
@@ -123,7 +145,7 @@ def expected_slot(save: dict, k: dict) -> float:
         return worst.index(k["orig"]) + 1
     slot_now = 31 - ranks[k["orig"]]
     years_out = k["year"] - save["season"]
-    if save["phase"] in ("deadline",) and years_out == 0:
+    if save["phase"] in ("season", "deadline", "stretch") and years_out == 0:
         return 15.5 + (slot_now - 15.5) * 0.92
     return 15.5 + (slot_now - 15.5) * (0.65 ** (years_out + 0.3))
 
@@ -140,6 +162,9 @@ def pick_value(save: dict, k: dict, mode: str) -> float:
 
 
 def heat_of(save: dict, pid: str) -> dict:
+    p = save["players"].get(pid) or {}
+    if p.get("wants_out"):
+        return {"h": 0.9, "label": "Trade request", "reporter": "in your league", "tier": 1}
     if not save.get("live"):
         return {}
     return ((save.get("heat") or {}).get("players") or {}).get(pid) or {}
@@ -167,6 +192,7 @@ def reluctance(save: dict, abbr: str, p: dict) -> float:
 
 
 UNTOUCHABLE = 0.7
+APRON_TOLERANCE = 1_000_000   # house rule: above the first apron, incoming salary may exceed outgoing by $1M
 
 
 # ------------------------------------------------------------------------------------------
@@ -217,6 +243,10 @@ def validate(save: dict, t: Trade) -> list[str]:
     problems: list[str] = []
     if t.a == t.b:
         return ["A team can't trade with itself."]
+    if save.get("phase") == "stretch":
+        return ["The trade deadline has passed. Trades reopen after the playoffs."]
+    if save.get("phase") == "draft":
+        return ["Trades are paused during the draft. Finish it with /rebuild sim."]
     if not t.a_out and not t.b_out:
         return ["Add something to the trade first."]
     if not t.a_out or not t.b_out:
@@ -242,8 +272,10 @@ def validate(save: dict, t: Trade) -> list[str]:
             problems.append(f"{name} would have {std_after} players (max {roster_limit(save)}). Send back more players.")
         if after > cap["cap"] and in_sal > out_sal:
             if after > cap["apron1"]:
-                problems.append(f"{name} would finish above the first apron ({cba.money(after)}), so they can't "
-                                f"take back more salary than they send ({cba.money(in_sal)} in vs {cba.money(out_sal)} out).")
+                if in_sal > out_sal + APRON_TOLERANCE:
+                    problems.append(f"{name} would finish above the first apron ({cba.money(after)}), so they can take "
+                                    f"back at most {cba.money(APRON_TOLERANCE)} more than they send "
+                                    f"({cba.money(in_sal)} in vs {cba.money(out_sal)} out).")
             else:
                 allowed = cba.max_incoming(out_sal, L.cap_year(save))
                 if before < cap["cap"]:
@@ -259,6 +291,8 @@ def validate(save: dict, t: Trade) -> list[str]:
 
 def stepien(save: dict, team: str, out_k: list[str], in_k: list[str]) -> list[str]:
     """Stepien rule: a team can't be without a first-round pick in consecutive future drafts."""
+    if not any(save["picks"][k]["round"] == 1 for k in out_k if k in save["picks"]):
+        return []
     owned = {k["year"] for k in save["picks"].values()
              if k["round"] == 1 and ((k["owner"] == team and k["id"] not in out_k) or k["id"] in in_k)}
     first = save["season"] + (1 if save["phase"] not in ("preseason", "deadline") else 0)
@@ -311,7 +345,9 @@ def evaluate(save: dict, team: str, incoming: list[str], outgoing: list[str]) ->
     season = save["season"]
     in_p, in_k = _split(incoming)
     out_p, out_k = _split(outgoing)
-    pv = sorted((player_value(save["players"][p], mode, season) for p in in_p), reverse=True)
+    before_pay = L.payroll(save, team)
+    room_after = before_pay - _salary(save, out_p) + _salary(save, in_p) <= cba.cap_sheet(L.cap_year(save))["cap"]
+    pv = sorted((player_value(save["players"][p], mode, season, cap_room=room_after) for p in in_p), reverse=True)
     std_after = L.standard_count(save, team) - len(out_p) + len(in_p)
     overflow = max(0, std_after - roster_limit(save))
     value_in = 0.0
@@ -340,6 +376,8 @@ def evaluate(save: dict, team: str, incoming: list[str], outgoing: list[str]) ->
 
 
 def apply_trade(save: dict, t: Trade, news: bool = False) -> str:
+    from . import chem
+    arrivals: dict[str, list[dict]] = {t.a: [], t.b: []}
     for team, out in ((t.a, t.a_out), (t.b, t.b_out)):
         other = t.b if team == t.a else t.a
         for aid in out:
@@ -347,8 +385,16 @@ def apply_trade(save: dict, t: Trade, news: bool = False) -> str:
             if kind == "p":
                 L.move_player(save, key, other)
                 save["players"][key]["acq"] = save["season"]
+                chem.reset_after_move(save["players"][key])
+                arrivals[other].append(save["players"][key])
             else:
                 save["picks"][key]["owner"] = other
+    if save.get("lineup") and any(arrivals.values()):
+        mine = {p["id"] for p in L.roster(save, save["team"])}
+        save["lineup"]["minutes"] = {k: v for k, v in save["lineup"]["minutes"].items() if k in mine}
+        save["lineup"]["starters"] = [k for k in save["lineup"].get("starters", []) if k in mine]
+    for team, ps in arrivals.items():
+        chem.after_trade(save, team, ps)
     a_names = ", ".join(asset_label(save, x, False) for x in t.a_out)
     b_names = ", ".join(asset_label(save, x, False) for x in t.b_out)
     text = f"{cba.TEAMS[t.a].abbr} get {b_names} · {cba.TEAMS[t.b].abbr} get {a_names}"
@@ -459,14 +505,19 @@ def _asset_value(save: dict, aid: str, mode: str) -> float:
 
 def best_package(save: dict, buyer: str, seller: str, pid: str, seller_must_agree: bool,
                  judge_mode: str = "middle") -> Trade | None:
-    """The best package `buyer` would give for player `pid` (owned by `seller`)."""
+    """The best package `buyer` would give for player `pid` (owned by `seller`).
+
+    Fast pass: price every combination with precomputed values and quick salary math, then run
+    the full CBA check and both teams' evaluations only on the most promising few."""
     p = save["players"][pid]
     season = save["season"]
     bmode = mode_of(save, buyer)
+    smode = mode_of(save, seller)
     target_val = player_value(p, bmode, season)
     if target_val < 25:
         return None
-    cap = cba.cap_sheet(L.cap_year(save))
+    yr = L.cap_year(save)
+    cap = cba.cap_sheet(yr)
     psal = 0 if p.get("twoway") else L.salary_now(p)
     b_pay, s_pay = L.payroll(save, buyer), L.payroll(save, seller)
     cand = []
@@ -480,44 +531,51 @@ def best_package(save: dict, buyer: str, seller: str, pid: str, seller_must_agre
     cand = cand[:11]
     picks = [k for k in L.team_picks(save, buyer) if k["year"] >= season][:6]
     pick_cost = {k["id"]: pick_value(save, k, bmode) * 1.08 for k in picks}
-    best: tuple[float, Trade] | None = None
-    smode = mode_of(save, seller)
+    judge = smode if seller_must_agree else judge_mode
+    worth_p = {q["id"]: player_value(q, judge, season) for q, _ in cand}
+    worth_k = {k["id"]: pick_value(save, k, judge) for k in picks}
+    seller_cost = player_value(p, smode, season) * (1 + reluctance(save, seller, p)) if seller_must_agree else 0.0
+
+    def salary_ok(team_pay, out_s, in_s):
+        after = team_pay - out_s + in_s
+        if after <= cap["cap"] or in_s <= out_s:
+            return True
+        if after > cap["apron1"]:
+            return in_s <= out_s + APRON_TOLERANCE
+        return in_s <= max(cba.max_incoming(out_s, yr), out_s + max(0, cap["cap"] - team_pay))
+
+    shortlist: list[tuple[float, list, tuple]] = []
     for n in range(0, 4):
         for combo in itertools.combinations(cand, n):
-            out_sal = sum(0 if q.get("twoway") else L.salary_now(q) for q, _ in combo)
-            # quick salary checks both ways (full validation on finalists)
-            b_after = b_pay - out_sal + psal
-            if b_after > cap["cap"] and psal > out_sal:
-                if b_after > cap["apron1"] or psal > max(cba.max_incoming(out_sal, season),
-                                                          out_sal + max(0, cap["cap"] - b_pay)):
-                    continue
-            s_after = s_pay - psal + out_sal
-            if s_after > cap["cap"] and out_sal > psal:
-                if s_after > cap["apron1"] or out_sal > max(cba.max_incoming(psal, season),
-                                                            psal + max(0, cap["cap"] - s_pay)):
-                    continue
+            out_sal = sum(L.salary_now(q) for q, _ in combo)
+            if not salary_ok(b_pay, out_sal, psal) or not salary_ok(s_pay, psal, out_sal):
+                continue
             base_cost = sum(c for _, c in combo)
             if base_cost > target_val * 1.02:
                 continue
+            base_worth = sum(worth_p[q["id"]] for q, _ in combo)
             for m in range(0, 3):
                 for pk in itertools.combinations(picks, m):
+                    if n == 0 and m == 0:
+                        continue
                     cost = base_cost + sum(pick_cost[k["id"]] for k in pk)
-                    if cost > target_val * 1.02 or (n == 0 and m == 0):
+                    if cost > target_val * 1.02:
                         continue
-                    t = Trade(buyer, seller, [f"p:{q['id']}" for q, _ in combo] + [f"k:{k['id']}" for k in pk],
-                              [f"p:{pid}"])
-                    worth = sum(player_value(q, judge_mode if not seller_must_agree else smode, season)
-                                for q, _ in combo) + sum(pick_value(save, k, judge_mode) for k in pk)
-                    if best is not None and worth <= best[0]:
-                        continue
-                    if validate(save, t):
-                        continue
-                    if evaluate(save, buyer, t.b_out, t.a_out).gain < 0:
-                        continue
-                    if seller_must_agree and evaluate(save, seller, t.a_out, t.b_out).gain < 0:
-                        continue
-                    best = (worth, t)
-    return best[1] if best else None
+                    worth = base_worth + sum(worth_k[k["id"]] for k in pk)
+                    if seller_must_agree and worth < seller_cost * 0.9:
+                        continue      # clearly not enough for the seller
+                    shortlist.append((worth, list(combo), pk))
+    shortlist.sort(key=lambda x: -x[0])
+    for worth, combo, pk in shortlist[:12]:
+        t = Trade(buyer, seller, [f"p:{q['id']}" for q, _ in combo] + [f"k:{k['id']}" for k in pk], [f"p:{pid}"])
+        if validate(save, t):
+            continue
+        if evaluate(save, buyer, t.b_out, t.a_out).gain < 0:
+            continue
+        if seller_must_agree and evaluate(save, seller, t.a_out, t.b_out).gain < 0:
+            continue
+        return t
+    return None
 
 
 def shop_player(save: dict, pid: str, limit: int = 3) -> list[tuple[Trade, float]]:
@@ -536,32 +594,51 @@ def shop_player(save: dict, pid: str, limit: int = 3) -> list[tuple[Trade, float
 
 
 def ai_trades(save: dict, rng: random.Random, max_trades: int = 4) -> list[str]:
-    """Trades between AI teams (sellers move veterans and rumored players to buyers)."""
+    """Trades between AI teams. Sellers (rebuilding teams, some middling ones, anyone with a player
+    who asked out) move veterans and role players to buyers. Stars rarely move unless they've
+    requested a trade. Each team makes at most two deals per call."""
     done: list[str] = []
-    touched: set[str] = set()
+    touched: dict[str, int] = {}
     sellers = [a for a in cba.TEAMS if a != save["team"] and mode_of(save, a) == "rebuild"]
-    sellers += [a for a in cba.TEAMS if a != save["team"] and mode_of(save, a) == "middle" and rng.random() < 0.35]
+    sellers += [a for a in cba.TEAMS if a != save["team"] and mode_of(save, a) == "middle" and rng.random() < 0.6]
+    sellers += [a for a in cba.TEAMS if a != save["team"] and a not in sellers
+                and any(p.get("wants_out") for p in L.roster(save, a))]
     rng.shuffle(sellers)
-    for seller in sellers:
-        if len(done) >= max_trades:
-            break
-        if seller in touched:
-            continue
-        cands = [p for p in L.roster(save, seller)
-                 if p["ovr"] >= 74 and (p["age"] >= 27 or heat_of(save, p["id"]).get("h", 0) > 0.3)]
-        rng.shuffle(cands)
-        for p in cands[:2]:
-            buyers = [b for b in cba.TEAMS if b not in (seller, save["team"]) and b not in touched
-                      and mode_of(save, b) != "rebuild"]
-            rng.shuffle(buyers)
-            for buyer in buyers[:6]:
-                t = best_package(save, buyer, seller, p["id"], seller_must_agree=True)
-                if t and rng.random() < 0.8:
-                    done.append(apply_trade(save, t, news=True))
-                    touched |= {buyer, seller}
+    for _round in range(2):
+        for seller in sellers:
+            if len(done) >= max_trades:
+                return done
+            if touched.get(seller, 0) >= 2:
+                continue
+            ros = L.roster(save, seller, include_twoway=False)
+            cands = []
+            for i, p in enumerate(ros):
+                h = heat_of(save, p["id"]).get("h", 0)
+                if p["ovr"] < 68 or not (p["age"] >= 26 or h > 0.3 or p["ovr"] < 76):
+                    continue
+                if p.get("acq") == save["season"] and h < 0.6:
+                    continue      # just got here
+                if (i == 0 or p["ovr"] >= 86) and h < 0.6:
+                    continue      # franchise stars only move when they've asked out
+                if p["ovr"] >= 82 and h < 0.6 and rng.random() < 0.6:
+                    continue      # good starters move, but not often
+                cands.append(p)
+            rng.shuffle(cands)
+            for p in cands[:3]:
+                buyers = [x for x in cba.TEAMS if x not in (seller, save["team"]) and touched.get(x, 0) < 2
+                          and mode_of(save, x) != "rebuild"]
+                rng.shuffle(buyers)
+                made = False
+                for buyer in buyers[:6]:
+                    t = best_package(save, buyer, seller, p["id"], seller_must_agree=True)
+                    if t and rng.random() < 0.75:
+                        done.append(apply_trade(save, t, news=True))
+                        touched[buyer] = touched.get(buyer, 0) + 1
+                        touched[seller] = touched.get(seller, 0) + 1
+                        made = True
+                        break
+                if made:
                     break
-            if seller in touched:
-                break
     return done
 
 

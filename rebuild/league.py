@@ -16,7 +16,9 @@ ROTATION_WEIGHTS = [0.20, 0.17, 0.15, 0.13, 0.11, 0.08, 0.06, 0.04, 0.03, 0.03]
 
 PHASES = {
     "preseason": "Preseason",
+    "season": "Regular Season",
     "deadline": "Trade Deadline",
+    "stretch": "Stretch Run (trades locked)",
     "postseason": "Season Complete",
     "draft": "NBA Draft",
     "resign": "Re-signing Period",
@@ -79,7 +81,19 @@ def new_save(live: dict, team: str, user_id: int, heat: dict | None = None) -> d
         "draft": None,
         "trades": 0,
     }
+    for pid in live.get("fa", []):
+        if pid in players and not players[pid].get("team"):
+            save["fa"].append(pid)
     trim_camp_rosters(save)
+    from . import chem, coaches, draft
+    import random as _r
+    rng = _r.Random()
+    for p in save["players"].values():   # not every young player reaches his projection
+        if p["age"] <= 23:
+            p["pot"] = int(max(p["ovr"], min(99, p.get("pot", p["ovr"]) + rng.gauss(-1.0, 3.5))))
+    coaches.init(save)
+    chem.init(save)
+    draft.ensure_class(save, rng)
     return save
 
 
@@ -125,11 +139,76 @@ def standard_count(save: dict, abbr: str) -> int:
     return len(roster(save, abbr, include_twoway=False))
 
 
+AUTO_MIN = [36, 34, 32, 30, 28, 24, 20, 16, 12, 8]   # how coaches split 240 minutes by default
+GUARDS, BIGS = {"PG", "SG"}, {"PF", "C"}
+
+
+def auto_minutes(ps: list[dict]) -> dict[str, int]:
+    order = sorted(ps, key=lambda p: (-p["ovr"], p["name"]))
+    return {p["id"]: (AUTO_MIN[i] if i < len(AUTO_MIN) else 0) for i, p in enumerate(order)}
+
+
+def minutes(save: dict, abbr: str, healthy_only: bool = True) -> dict[str, int]:
+    """Minutes per game for each player. Your team follows your lineup settings (injured players'
+    minutes go to the next guys up); AI teams play their best players the most."""
+    ps = [p for p in roster(save, abbr) if not (healthy_only and (p.get("out", 0) > 0 or p.get("rest")))]
+    lineup = save.get("lineup") if abbr == save.get("team") else None
+    if not lineup or not lineup.get("minutes"):
+        return auto_minutes(ps)
+    um = lineup["minutes"]
+    mins = {p["id"]: int(um.get(p["id"], 0)) for p in ps}
+    short = 240 - sum(mins.values())
+    if short > 0:  # injuries/trades left holes: hand minutes to the best available players
+        for p in sorted(ps, key=lambda p: -p["ovr"]):
+            give = min(short, max(0, 34 - mins[p["id"]]))
+            mins[p["id"]] += give
+            short -= give
+            if short <= 0:
+                break
+    elif short < 0:
+        k = 240 / max(1, sum(mins.values()))
+        mins = {pid: int(round(m * k)) for pid, m in mins.items()}
+    return mins
+
+
+def starters(save: dict, abbr: str) -> list[dict]:
+    lineup = save.get("lineup") if abbr == save.get("team") else None
+    ros = {p["id"]: p for p in roster(save, abbr) if p.get("out", 0) <= 0}
+    chosen = [ros[i] for i in (lineup or {}).get("starters", []) if i in ros]
+    if len(chosen) < 5:
+        mins = minutes(save, abbr)
+        for p in sorted(ros.values(), key=lambda p: -mins.get(p["id"], 0)):
+            if p not in chosen:
+                chosen.append(p)
+            if len(chosen) == 5:
+                break
+    return chosen[:5]
+
+
 def strength(save: dict, abbr: str, healthy_only: bool = False) -> float:
-    ps = [p for p in roster(save, abbr) if not (healthy_only and p.get("out", 0) > 0)]
-    ovrs = sorted((p["ovr"] for p in ps), reverse=True)[: len(ROTATION_WEIGHTS)]
-    ovrs += [45] * (len(ROTATION_WEIGHTS) - len(ovrs))
-    return sum(w * o for w, o in zip(ROTATION_WEIGHTS, ovrs))
+    """Team quality: rotation-weighted ratings, adjusted for how minutes are actually split, fatigue,
+    unhappy players and a balanced starting five."""
+    ps = {p["id"]: p for p in roster(save, abbr) if not (healthy_only and (p.get("out", 0) > 0 or p.get("rest")))}
+    mins = minutes(save, abbr, healthy_only)
+    order = sorted(ps.values(), key=lambda p: (-mins.get(p["id"], 0), -p["ovr"]))[: len(ROTATION_WEIGHTS)]
+    total_w = 0.0
+    acc = 0.0
+    for slot, p in enumerate(order):
+        m = mins.get(p["id"], 0)
+        if m <= 0:
+            continue
+        w = ROTATION_WEIGHTS[slot] * min(m / AUTO_MIN[slot], 1.6)
+        eff = p["ovr"] - max(0, m - 36) * 0.35 - (2.0 if p.get("wants_out") else 0.0)
+        acc += w * eff
+        total_w += w
+    if total_w < 1.0:  # thin roster: empty rotation spots play like replacement-level guys
+        acc += (1.0 - total_w) * 45
+        total_w = 1.0
+    base = acc / total_w
+    five = starters(save, abbr) if (healthy_only or abbr == save.get("team")) else []
+    if five and (not any(p["pos"] in GUARDS for p in five) or not any(p["pos"] in BIGS for p in five)):
+        base -= 0.6
+    return base
 
 
 def strength_ranks(save: dict) -> dict[str, int]:

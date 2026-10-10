@@ -1,0 +1,426 @@
+{
+ "_note": "2027 NBA Draft big board: ESPN's early 2027 mock draft (Jeremy Woo, June 25, 2026). Ratings and ranges are the bot's own projections. Later draft classes are generated.",
+ "year": 2027,
+ "prospects": [
+  {
+   "rank": 1,
+   "name": "Tyran Stokes",
+   "pos": "SF",
+   "school": "Kansas",
+   "age": 19
+  },
+  {
+   "rank": 2,
+   "name": "Jordan Smith Jr.",
+   "pos": "PG",
+   "school": "Arkansas",
+   "age": 19
+  },
+  {
+   "rank": 3,
+   "name": "Caleb Holt",
+   "pos": "SG",
+   "school": "Arizona",
+   "age": 19
+  },
+  {
+   "rank": 4,
+   "name": "Bruce Branch III",
+   "pos": "SG",
+   "school": "BYU",
+   "age": 19
+  },
+  {
+   "rank": 5,
+   "name": "Stefan Joksimovic",
+   "pos": "PG",
+   "school": "Baskonia (Spain)",
+   "age": 19
+  },
+  {
+   "rank": 6,
+   "name": "Braylon Mullins",
+   "pos": "SG",
+   "school": "UConn",
+   "age": 20
+  },
+  {
+   "rank": 7,
+   "name": "Thomas Haugh",
+   "pos": "SF",
+   "school": "Florida",
+   "age": 23
+  },
+  {
+   "rank": 8,
+   "name": "Jason Crowe Jr.",
+   "pos": "PG",
+   "school": "Missouri",
+   "age": 19
+  },
+  {
+   "rank": 9,
+   "name": "Anthony Thompson",
+   "pos": "SF",
+   "school": "Ohio State",
+   "age": 19
+  },
+  {
+   "rank": 10,
+   "name": "Cameron Williams",
+   "pos": "C",
+   "school": "Duke",
+   "age": 19
+  },
+  {
+   "rank": 11,
+   "name": "Caleb Gaskins",
+   "pos": "PF",
+   "school": "Miami",
+   "age": 19
+  },
+  {
+   "rank": 12,
+   "name": "Miikka Muurinen",
+   "pos": "PF",
+   "school": "Arkansas",
+   "age": 19
+  },
+  {
+   "rank": 13,
+   "name": "Austin Goosby",
+   "pos": "PG",
+   "school": "Texas",
+   "age": 19
+  },
+  {
+   "rank": 14,
+   "name": "Motiejus Krivas",
+   "pos": "C",
+   "school": "Arizona",
+   "age": 22
+  },
+  {
+   "rank": 15,
+   "name": "Luigi Suigo",
+   "pos": "C",
+   "school": "Villanova",
+   "age": 19
+  },
+  {
+   "rank": 16,
+   "name": "Matt Able",
+   "pos": "SG",
+   "school": "North Carolina",
+   "age": 20
+  },
+  {
+   "rank": 17,
+   "name": "Alex Condon",
+   "pos": "PF",
+   "school": "Florida",
+   "age": 22
+  },
+  {
+   "rank": 18,
+   "name": "Dame Sarr",
+   "pos": "SG",
+   "school": "Duke",
+   "age": 20
+  },
+  {
+   "rank": 19,
+   "name": "Cameron Houindo",
+   "pos": "PF",
+   "school": "Cedevita",
+   "age": 19
+  },
+  {
+   "rank": 20,
+   "name": "Christian Collins",
+   "pos": "SF",
+   "school": "USC",
+   "age": 19
+  },
+  {
+   "rank": 21,
+   "name": "Babatunde Oladotun",
+   "pos": "SF",
+   "school": "Maryland",
+   "age": 19
+  },
+  {
+   "rank": 22,
+   "name": "Jaxon Richardson",
+   "pos": "SF",
+   "school": "Alabama",
+   "age": 19
+  },
+  {
+   "rank": 23,
+   "name": "Brandon McCoy",
+   "pos": "SG",
+   "school": "Michigan",
+   "age": 19
+  },
+  {
+   "rank": 24,
+   "name": "Hugo Yimga-Moukouri",
+   "pos": "SF",
+   "school": "Nanterre (France)",
+   "age": 19
+  },
+  {
+   "rank": 25,
+   "name": "Sayon Keita",
+   "pos": "C",
+   "school": "North Carolina",
+   "age": 19
+  },
+  {
+   "rank": 26,
+   "name": "Amari Allen",
+   "pos": "SF",
+   "school": "Alabama",
+   "age": 20
+  },
+  {
+   "rank": 27,
+   "name": "Ivan Kharchenkov",
+   "pos": "SF",
+   "school": "Arizona",
+   "age": 20
+  },
+  {
+   "rank": 28,
+   "name": "Patrick Ngongba II",
+   "pos": "C",
+   "school": "Duke",
+   "age": 20
+  },
+  {
+   "rank": 29,
+   "name": "Juke Harris",
+   "pos": "SG",
+   "school": "Tennessee",
+   "age": 20
+  },
+  {
+   "rank": 30,
+   "name": "Tyler Tanner",
+   "pos": "PG",
+   "school": "Vanderbilt",
+   "age": 21
+  },
+  {
+   "rank": 31,
+   "name": "Malachi Moreno",
+   "pos": "C",
+   "school": "Kentucky",
+   "age": 20
+  },
+  {
+   "rank": 32,
+   "name": "Cheickh Niang",
+   "pos": "SG",
+   "school": "Trento (Italy)",
+   "age": 19
+  },
+  {
+   "rank": 33,
+   "name": "Colben Landrew",
+   "pos": "SG",
+   "school": "UConn",
+   "age": 19
+  },
+  {
+   "rank": 34,
+   "name": "Obinna Ekezie Jr.",
+   "pos": "C",
+   "school": "Louisville",
+   "age": 19
+  },
+  {
+   "rank": 35,
+   "name": "Trey McKenney Jr.",
+   "pos": "SG",
+   "school": "Michigan",
+   "age": 20
+  },
+  {
+   "rank": 36,
+   "name": "Quentin Coleman",
+   "pos": "PG",
+   "school": "Illinois",
+   "age": 19
+  },
+  {
+   "rank": 37,
+   "name": "Dylan Mingo",
+   "pos": "PG",
+   "school": "Baylor",
+   "age": 19
+  },
+  {
+   "rank": 38,
+   "name": "Stefan Vaaks",
+   "pos": "SG",
+   "school": "Illinois",
+   "age": 20
+  },
+  {
+   "rank": 39,
+   "name": "Milan Momcilovic",
+   "pos": "PF",
+   "school": "Kentucky",
+   "age": 22
+  },
+  {
+   "rank": 40,
+   "name": "Dash Daniels",
+   "pos": "PG",
+   "school": "Melbourne United",
+   "age": 19
+  },
+  {
+   "rank": 41,
+   "name": "Massamba Diop",
+   "pos": "C",
+   "school": "Gonzaga",
+   "age": 20
+  },
+  {
+   "rank": 42,
+   "name": "Tounde Yessoufou",
+   "pos": "SG",
+   "school": "St. John's",
+   "age": 20
+  },
+  {
+   "rank": 43,
+   "name": "Moustapha Thiam",
+   "pos": "C",
+   "school": "Michigan",
+   "age": 21
+  },
+  {
+   "rank": 44,
+   "name": "David Mirkovic",
+   "pos": "PF",
+   "school": "Illinois",
+   "age": 20
+  },
+  {
+   "rank": 45,
+   "name": "Miles Byrd",
+   "pos": "SG",
+   "school": "Providence",
+   "age": 22
+  },
+  {
+   "rank": 46,
+   "name": "Joseph Tugler",
+   "pos": "PF",
+   "school": "Houston",
+   "age": 22
+  },
+  {
+   "rank": 47,
+   "name": "Flory Bidunga",
+   "pos": "C",
+   "school": "Louisville",
+   "age": 21
+  },
+  {
+   "rank": 48,
+   "name": "Shelton Henderson",
+   "pos": "SG",
+   "school": "Miami",
+   "age": 20
+  },
+  {
+   "rank": 49,
+   "name": "Davis Fogle",
+   "pos": "SG",
+   "school": "Gonzaga",
+   "age": 20
+  },
+  {
+   "rank": 50,
+   "name": "Jacob Cofie",
+   "pos": "PF",
+   "school": "USC",
+   "age": 20
+  },
+  {
+   "rank": 51,
+   "name": "Rueben Chinyelu",
+   "pos": "C",
+   "school": "Florida",
+   "age": 22
+  },
+  {
+   "rank": 52,
+   "name": "Billy Richmond III",
+   "pos": "SG",
+   "school": "Arkansas",
+   "age": 21
+  },
+  {
+   "rank": 53,
+   "name": "Neoklis Avdalas",
+   "pos": "SF",
+   "school": "North Carolina",
+   "age": 20
+  },
+  {
+   "rank": 54,
+   "name": "Sam Lewis",
+   "pos": "SG",
+   "school": "Virginia",
+   "age": 22
+  },
+  {
+   "rank": 55,
+   "name": "Pryce Sandfort",
+   "pos": "SF",
+   "school": "Nebraska",
+   "age": 22
+  },
+  {
+   "rank": 56,
+   "name": "Matas Vokietaitis",
+   "pos": "C",
+   "school": "Texas",
+   "age": 21
+  },
+  {
+   "rank": 57,
+   "name": "Andrej Stojakovic",
+   "pos": "SG",
+   "school": "Illinois",
+   "age": 22
+  },
+  {
+   "rank": 58,
+   "name": "Jeremy Fears Jr.",
+   "pos": "PG",
+   "school": "Michigan State",
+   "age": 21
+  },
+  {
+   "rank": 59,
+   "name": "Killyan Toure",
+   "pos": "PG",
+   "school": "Iowa State",
+   "age": 20
+  },
+  {
+   "rank": 60,
+   "name": "John Blackwell",
+   "pos": "SG",
+   "school": "Duke",
+   "age": 22
+  }
+ ]
+}

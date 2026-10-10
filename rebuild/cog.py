@@ -13,10 +13,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from . import ai, cba, sim
+from . import ai, cba, chem, coaches, fa, sim, style
+from . import stats as stats_mod
+from . import draft as draft_mod
 from . import embeds as E
 from . import league as L
-from .data import fetch_league
+from .data import fetch_espn, league_from
+from .sources import fetch_2k, fetch_contracts, name_key
 from .rumors import RumorFeed, TIER_BADGE, fetch_items, fold
 from .storage import Store
 
@@ -26,6 +29,9 @@ LEAGUE_REFRESH_SECS = 6 * 3600
 RUMOR_REFRESH_SECS = 10 * 60
 VIEW_TIMEOUT = 15 * 60
 MAX_CACHED_SAVES = 20
+EXTRAS_REFRESH_SECS = 12 * 3600
+LIVE_KEY = "live_league_v3"
+EXTRAS_KEY = "extras_v1"
 NO_PINGS = discord.AllowedMentions.none()
 
 
@@ -271,21 +277,26 @@ class SimView(OwnerView):
     def build(self, save: dict) -> None:
         self.clear_items()
         ph = save["phase"]
-        if ph == "preseason":
-            self._button("Sim to trade deadline", "⏩", discord.ButtonStyle.primary, self.to_deadline)
-            self._button("Sim full season + playoffs", "⏭️", discord.ButtonStyle.secondary, self.to_end)
-        elif ph == "deadline":
-            self._button("Sim rest of season + playoffs", "⏭️", discord.ButtonStyle.primary, self.to_end)
+        if ph in ("preseason", "season", "deadline", "stretch") and not sim.season_over(save):
+            self._button("Sim 1 week", "▶️", discord.ButtonStyle.primary, self.week)
+            self._button("Sim 1 month", "⏩", discord.ButtonStyle.secondary, self.month)
+            if not save.get("deadline_done"):
+                self._button("Sim to trade deadline", "⏰", discord.ButtonStyle.secondary, self.to_deadline)
+            else:
+                self._button("Sim to end of season", "⏭️", discord.ButtonStyle.secondary, self.to_end_rs)
+        elif ph in ("season", "deadline", "stretch"):
+            self._button("Play the playoffs", "🏆", discord.ButtonStyle.success, self.playoffs)
         elif ph == "postseason":
             self._button("Start offseason (lottery + draft)", "🎟️", discord.ButtonStyle.primary, self.offseason)
         elif ph == "draft":
             prospects = (save.get("draft") or {}).get("prospects") or []
-            if sim.on_the_clock(save) and sim.on_the_clock(save)["owner"] == save["team"]:
+            slot = sim.on_the_clock(save)
+            if slot and slot["owner"] == save["team"]:
                 opts = [discord.SelectOption(
                     label=f"#{p['big_board']} {p['name']} ({p['pos']}, {p['age']})"[:100], value=p["id"],
                     description=f"OVR {p['ovr']} · Scouts' ceiling {p['scout'] - 3}-{p['scout'] + 3}"[:100])
                     for p in prospects[:25]]
-                sel = discord.ui.Select(placeholder="You're on the clock: pick a player", options=opts, row=0)
+                sel = discord.ui.Select(placeholder=f"You're on the clock at #{slot['no']}: pick a player", options=opts, row=0)
                 sel.callback = self._draft_pick
                 self.add_item(sel)
                 self._button("Auto-pick best available", "🤖", discord.ButtonStyle.secondary, self.auto_pick)
@@ -297,7 +308,7 @@ class SimView(OwnerView):
                 p = save["players"].get(pid)
                 if not p:
                     continue
-                desc = "Won't re-sign: wants a contender" if a["refuses"] else \
+                desc = "Won't re-sign: wants a fresh start" if a["refuses"] else \
                     f"Asking {cba.money(a['amount'])}/yr × {a['years']} (Bird rights)"
                 opts.append(discord.SelectOption(label=f"{p['name']} ({p['pos']}, {p['ovr']}, age {p['age']})"[:100],
                                                  value=pid, description=desc[:100]))
@@ -307,19 +318,8 @@ class SimView(OwnerView):
                 self.add_item(sel)
             self._button("Open free agency", "🛒", discord.ButtonStyle.primary, self.open_fa)
         elif ph == "fa":
-            pool = sorted((save["players"][i] for i in save["fa"] if i in save.get("fa_asks", {})),
-                          key=lambda p: -p["ovr"])[:25]
-            opts = []
-            for p in pool:
-                ok, how, amt = sim.fa_options(save, p["id"])
-                opts.append(discord.SelectOption(
-                    label=f"{p['name']} ({p['pos']}, {p['ovr']}, age {p['age']})"[:100], value=p["id"],
-                    description=(f"{'✅' if ok else '❌'} {cba.money(amt)}/yr × {save['fa_asks'][p['id']]['years']}"
-                                 f"{' · ' + how if ok else ''}")[:100]))
-            if opts:
-                sel = discord.ui.Select(placeholder="Sign a free agent", options=opts, row=0)
-                sel.callback = self._sign
-                self.add_item(sel)
+            self._button(f"Next free agency day (day {save.get('fa_day', 0) + 1})", "📅",
+                         discord.ButtonStyle.primary, self.next_day)
             self._button("Finish offseason → next season", "🏁", discord.ButtonStyle.success, self.next_season)
 
     def _button(self, label, emoji, style, fn):
@@ -341,26 +341,53 @@ class SimView(OwnerView):
             embed = make_embed(save, result)
             await interaction.edit_original_response(embed=embed, view=self if self.children else None)
 
-    async def to_deadline(self, interaction):
-        def embed(save, r):
-            e = discord.Embed(title="⏰ Trade deadline", color=E.color(save["team"]))
-            w, l = L.record(save, save["team"])
-            e.description = f"**{cba.TEAMS[save['team']].name}: {w}-{l}** at the deadline."
-            if r["trades"]:
-                e.add_field(name="Around the league", value="\n".join(f"🔁 {t}" for t in r["trades"])[:1024], inline=False)
-            inj = [n for n in save.get("news", [])[:8] if n.startswith("🚑")][:4]
-            if inj:
-                e.add_field(name="Injury report", value="\n".join(inj), inline=False)
-            if r["inbox"]:
-                e.add_field(name="📞 Your phone is ringing", value=f"{r['inbox']} team(s) sent you offers. Check `/rebuild inbox`.",
-                            inline=False)
-            e.add_field(name="Now", value="Make your deadline moves with `/rebuild trade`, then come back here to finish the season.",
+    def _chunk_embed(self, save: dict, r: dict) -> discord.Embed:
+        me = save["team"]
+        w, l = L.record(save, me)
+        title = "⏰ Trade deadline day" if r.get("deadline") else f"📅 {sim.calendar(save)}"
+        e = discord.Embed(title=title, color=E.color(me))
+        seed = next((f"#{o.index(me) + 1} in the {conf}" for conf, o in sim.seeds(save).items() if me in o), "")
+        e.description = (f"**{cba.TEAMS[me].name}: {w}-{l}** · {seed}\n"
+                         f"Chemistry: {chem.label(chem.value(save, me))} ({chem.value(save, me):.0f})")
+        if r.get("trades"):
+            e.add_field(name="Around the league", value="\n".join(f"🔁 {t}" for t in r["trades"])[:1024], inline=False)
+        notes = [n for n in r.get("news", []) if n.startswith(("📢", "🤝"))][:5]
+        notes += [n for n in r.get("news", []) if n.startswith("🚑")][:4]
+        if notes:
+            e.add_field(name="News", value="\n".join(notes)[:1024], inline=False)
+        hurt = [p for p in L.roster(save, me) if p.get("out", 0) > 0]
+        if hurt:
+            e.add_field(name="Your injury report", value="\n".join(f"🚑 {p['name']}: {p['inj']}" for p in hurt)[:1024],
                         inline=False)
-            e.set_footer(text=E.footer(save))
-            return e
-        await self._run(interaction, sim.sim_to_deadline, embed)
+        if r.get("deadline"):
+            msg = ("**Simulation paused for the deadline.** This is your last chance to trade until the summer "
+                   "(`/rebuild trade`, `/rebuild shop`), and a good time to extend players in the final year "
+                   "of their deals (`/rebuild extend`). Hit a sim button when you're done.")
+            if r.get("inbox"):
+                msg = f"📞 {r['inbox']} team(s) sent you offers (`/rebuild inbox`). " + msg
+            e.add_field(name="Deadline", value=msg, inline=False)
+        elif save["phase"] == "stretch":
+            e.set_footer(text="Trade deadline has passed · free agents can still be signed")
+        if r.get("awards"):
+            e.add_field(name="🏅 Regular-season awards", value="\n".join(f"**{k}:** {v}" for k, v in r["awards"].items())[:1024],
+                        inline=False)
+        if sim.season_over(save):
+            e.add_field(name="Regular season over", value="Hit **Play the playoffs**.", inline=False)
+        return e
 
-    async def to_end(self, interaction):
+    async def week(self, interaction):
+        await self._run(interaction, lambda s, rng: sim.sim_chunk(s, rng, games=sim.WEEK), self._chunk_embed)
+
+    async def month(self, interaction):
+        await self._run(interaction, lambda s, rng: sim.sim_chunk(s, rng, games=sim.WEEK * 4), self._chunk_embed)
+
+    async def to_deadline(self, interaction):
+        await self._run(interaction, sim.sim_to_deadline, self._chunk_embed)
+
+    async def to_end_rs(self, interaction):
+        await self._run(interaction, lambda s, rng: sim.sim_chunk(s, rng, to=sim.TOTAL_GAMES), self._chunk_embed)
+
+    async def playoffs(self, interaction):
         await self._run(interaction, sim.sim_postseason, lambda save, entry: E.season_embed(save, entry))
 
     async def offseason(self, interaction):
@@ -373,7 +400,7 @@ class SimView(OwnerView):
             e = discord.Embed(title=f"🎟️ {save['season']} Draft Lottery", color=E.color(save["team"]))
             e.description = f"Lottery results: {r['lottery']}"
             if r["notes"]:
-                e.add_field(name="Player development", value="\n".join(r["notes"])[:1024], inline=False)
+                e.add_field(name="Offseason news", value="\n".join(r["notes"])[:1024], inline=False)
             e.add_field(name="Draft so far", value=_draft_log(save), inline=False)
             mine = [p for p in save["draft"]["picks"][save["draft"]["idx"]:] if p["owner"] == save["team"]]
             e.add_field(name="Your picks", value=", ".join(f"#{p['no']}" for p in mine) or "You don't have a pick left.",
@@ -415,7 +442,7 @@ class SimView(OwnerView):
             if not a:
                 return "He's no longer available."
             if a["refuses"]:
-                return f"{save['players'][pid]['name']} wants to play for a contender and won't re-sign."
+                return f"{save['players'][pid]['name']} wants a fresh start and won't re-sign."
             return sim.resign(save, pid)
 
         def embed(save, msg):
@@ -423,17 +450,18 @@ class SimView(OwnerView):
             e.add_field(name="Your free agents", value=_asks_text(save), inline=False)
             e.add_field(name="Payroll next season", value=f"{cba.money(L.payroll(save, save['team']))} · "
                                                           f"{L.cap_status(save, save['team'])[0]}", inline=False)
+            e.set_footer(text="Anyone you don't re-sign becomes a free agent (you keep his Bird rights).")
             return e
         await self._run(interaction, work, embed)
 
     async def open_fa(self, interaction):
-        def embed(save, _):
-            return fa_embed(save, "🛒 Free agency is open. Anyone you didn't re-sign is now on the market.")
-        await self._run(interaction, sim.start_free_agency, embed)
+        await self._run(interaction, sim.start_free_agency,
+                        lambda save, _: fa_embed(save, "🛒 Free agency is open. Make offers with `/rebuild freeagents`, "
+                                                       "then advance day by day. Stars weigh every offer before deciding."))
 
-    async def _sign(self, interaction):
-        pid = interaction.data["values"][0]
-        await self._run(interaction, lambda save, rng: sim.sign_fa(save, pid), lambda save, msg: fa_embed(save, msg))
+    async def next_day(self, interaction):
+        await self._run(interaction, fa.advance_day,
+                        lambda save, news: fa_embed(save, "\n".join(news[:8]) or "A quiet day. Nobody met their price."))
 
     async def next_season(self, interaction):
         def embed(save, r):
@@ -464,37 +492,398 @@ def _asks_text(save: dict) -> str:
     return ("\n".join(lines) or "Nobody left to re-sign.")[:1024]
 
 
+def fa_pool(save: dict, limit: int = 25) -> list[dict]:
+    return sorted((save["players"][i] for i in dict.fromkeys(save["fa"]) if i in save["players"]
+                   and not save["players"][i].get("team")), key=lambda p: -p["ovr"])[:limit]
+
+
 def fa_embed(save: dict, msg: str) -> discord.Embed:
     me = save["team"]
     cap = cba.cap_sheet(L.cap_year(save))
     pay = L.payroll(save, me)
-    e = discord.Embed(title="🛒 Free agency", color=E.color(me), description=msg)
+    off = save["phase"] in fa.OFFSEASON
+    title = f"🛒 Free agency · day {save.get('fa_day', 0) + 1}" if save["phase"] == "fa" else "🛒 Free agents"
+    e = discord.Embed(title=title, color=E.color(me), description=msg[:4000])
+    used = fa._used_mle(save, me)
+    mle = "used" if used else (cba.money(cap["mle"]) + " (non-taxpayer)" if pay < cap["apron1"] else
+                               cba.money(cap["tp_mle"]) + " (taxpayer)" if pay < cap["apron2"] else "none (2nd apron)")
     e.add_field(name="Your books", value=(
-        f"Payroll {cba.money(pay)} · {L.cap_status(save, me)[0]}\n"
-        f"Mid-level: {'used' if save.get('used_mle') else (cba.money(cap['mle']) + ' (non-taxpayer)' if pay < cap['apron1'] else cba.money(cap['tp_mle']) + ' (taxpayer)')}\n"
-        f"Roster {L.standard_count(save, me)}/{cba.ROSTER_MAX} (cuts to 15 before the season)"), inline=False)
-    top = sorted((save["players"][i] for i in save["fa"] if i in save.get("fa_asks", {})), key=lambda p: -p["ovr"])[:10]
-    e.add_field(name="Best available", value="\n".join(
-        f"`{p['ovr']}` **{p['name']}** {p['pos']} · {p['age']} · asks {cba.money(save['fa_asks'][p['id']]['amount'])}"
-        for p in top)[:1024] or "Market is empty.", inline=False)
-    e.set_footer(text="Players on losing teams ask for more. Your own players can be re-signed over the cap with Bird rights.")
+        f"Payroll {cba.money(pay)} · {L.cap_status(save, me)[0]}\nMid-level: {mle} · Minimum: {cba.money(fa.min_salary(save))}\n"
+        f"Roster {L.standard_count(save, me)}/{fa.roster_limit(save)}"), inline=False)
+    lines = []
+    for p in fa_pool(save, 12):
+        want = fa.need(save, p, me)
+        can = fa.max_legal_offer(save, me, p) >= want * 0.9
+        pend = " · ⏳ your offer is pending" if p["id"] in (save.get("pending") or {}) else ""
+        lines.append(f"{'✅' if can else '❌'} `{p['ovr']}` **{p['name']}** {p['pos']} · {p['age']} · "
+                     f"wants ~{cba.money(want)} × {fa.pref_years(p)}{pend}")
+    e.add_field(name="Best available (what they'd want from you)", value="\n".join(lines)[:1024] or "Market is empty.",
+                inline=False)
+    e.set_footer(text=("Stars take less to join contenders with good coaches and a real role. "
+                       "Unsigned players' prices drop every day." if off else
+                       "In-season free agents sign on the spot if your offer is good enough."))
     return e
 
 
+class OfferModal(discord.ui.Modal):
+    def __init__(self, view, p: dict, want: int, years: int, title: str = "Offer"):
+        super().__init__(title=f"{title}: {p['name']}"[:45])
+        self.view_ref = view
+        self.pid = p["id"]
+        self.amount = discord.ui.TextInput(label="Salary per year, in millions (e.g. 12.5)",
+                                           default=f"{want / 1_000_000:.1f}", max_length=6)
+        self.years = discord.ui.TextInput(label="Years (1-5)", default=str(years), max_length=1)
+        self.add_item(self.amount)
+        self.add_item(self.years)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        try:
+            amount = int(round(float(str(self.amount.value).replace("$", "").replace("M", "").strip()) * 1_000_000, -4))
+            years = int(str(self.years.value).strip())
+        except ValueError:
+            return await interaction.response.send_message("Use numbers, like 12.5 and 3.", ephemeral=True)
+        await self.view_ref.make_offer(interaction, self.pid, amount, years)
+
+
+class FAView(OwnerView):
+    def __init__(self, cog: "Rebuild", user_id: int, save: dict):
+        super().__init__(cog, user_id)
+        self.build(save)
+
+    def build(self, save: dict) -> None:
+        self.clear_items()
+        me = save["team"]
+        opts = []
+        for p in fa_pool(save):
+            want = fa.need(save, p, me)
+            opts.append(discord.SelectOption(label=f"{p['name']} ({p['pos']}, {p['ovr']}, age {p['age']})"[:100],
+                                             value=p["id"],
+                                             description=f"Wants ~{cba.money(want)}/yr × {fa.pref_years(p)}"[:100]))
+        if opts:
+            sel = discord.ui.Select(placeholder="Make an offer to a free agent", options=opts, row=0)
+            sel.callback = self._pick
+            self.add_item(sel)
+        if save["phase"] == "fa":
+            b = discord.ui.Button(label="Next free agency day", emoji="📅", style=discord.ButtonStyle.primary, row=1)
+            b.callback = self._next_day
+            self.add_item(b)
+
+    async def _pick(self, interaction: discord.Interaction) -> None:
+        save = await self.cog.get_save(self.user_id)
+        p = save["players"].get(interaction.data["values"][0])
+        if not p or p.get("team"):
+            return await interaction.response.send_message("He just signed somewhere else.", ephemeral=True)
+        want = fa.need(save, p, save["team"])
+        await interaction.response.send_modal(OfferModal(self, p, want, fa.pref_years(p)))
+
+    async def make_offer(self, interaction: discord.Interaction, pid: str, amount: int, years: int) -> None:
+        async with self.cog.lock(self.user_id):
+            save = await self.cog.get_save(self.user_id)
+            if save["phase"] == "draft":
+                return await interaction.response.send_message("Finish the draft first.", ephemeral=True)
+            r = fa.offer(save, pid, amount, years)
+            await self.cog.persist(save, interaction)
+            self.build(save)
+            await interaction.response.edit_message(embed=fa_embed(save, r["msg"]), view=self)
+
+    async def _next_day(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
+        async with self.cog.lock(self.user_id):
+            save = await self.cog.get_save(self.user_id)
+            news = await asyncio.to_thread(fa.advance_day, save, random.Random())
+            await self.cog.persist(save, interaction)
+            self.build(save)
+            await interaction.edit_original_response(
+                embed=fa_embed(save, "\n".join(news[:8]) or "A quiet day. Nobody met their price."), view=self)
+
+
+class ExtendView(OwnerView):
+    def __init__(self, cog: "Rebuild", user_id: int, save: dict):
+        super().__init__(cog, user_id)
+        self.build(save)
+
+    def eligible(self, save: dict) -> list[dict]:
+        return [p for p in L.roster(save, save["team"]) if fa.extension_eligible(save, p)][:25]
+
+    def build(self, save: dict) -> None:
+        self.clear_items()
+        opts = []
+        for p in self.eligible(save):
+            a = fa.extension_ask(save, p)
+            desc = f"Won't extend: {a['reason']}" if a["refuses"] else f"Wants ~{cba.money(a['amount'])}/yr × {a['years']}"
+            opts.append(discord.SelectOption(label=f"{p['name']} ({p['pos']}, {p['ovr']}, age {p['age']})"[:100],
+                                             value=p["id"], description=desc[:100]))
+        if opts:
+            sel = discord.ui.Select(placeholder="Offer an extension", options=opts, row=0)
+            sel.callback = self._pick
+            self.add_item(sel)
+
+    def embed(self, save: dict, note: str | None = None) -> discord.Embed:
+        e = discord.Embed(title="📝 Contract extensions", color=E.color(save["team"]))
+        rows = []
+        for p in self.eligible(save):
+            a = fa.extension_ask(save, p)
+            rows.append(f"`{p['ovr']}` **{p['name']}** · {p['age']} · now {cba.money(L.salary_now(p))} · "
+                        + (f"❌ {a['reason']}" if a["refuses"] else f"wants ~{cba.money(a['amount'])} × {a['years']}"))
+        e.description = "\n".join(rows) or "Nobody on your roster is in the last year of his contract."
+        if note:
+            e.add_field(name="Update", value=note[:1024], inline=False)
+        e.set_footer(text="Extend players before they hit free agency. Unhappy players and stars on bad teams may want to test the market.")
+        return e
+
+    async def _pick(self, interaction: discord.Interaction) -> None:
+        save = await self.cog.get_save(self.user_id)
+        p = save["players"][interaction.data["values"][0]]
+        a = fa.extension_ask(save, p)
+        if a["refuses"]:
+            return await interaction.response.edit_message(
+                embed=self.embed(save, f"❌ {p['name']} won't discuss an extension. {a['reason']}"), view=self)
+        await interaction.response.send_modal(OfferModal(self, p, a["amount"], a["years"], title="Extension"))
+
+    async def make_offer(self, interaction: discord.Interaction, pid: str, amount: int, years: int) -> None:
+        async with self.cog.lock(self.user_id):
+            save = await self.cog.get_save(self.user_id)
+            r = fa.extend(save, pid, amount, years)
+            await self.cog.persist(save, interaction)
+            self.build(save)
+            await interaction.response.edit_message(embed=self.embed(save, r["msg"]), view=self)
+
+
+# ------------------------------------------------------------------------------------------
+# Lineup, coach, release
+# ------------------------------------------------------------------------------------------
+
+def lineup_embed(save: dict, note: str | None = None) -> discord.Embed:
+    me = save["team"]
+    mins = L.minutes(save, me, healthy_only=False)
+    five = {p["id"] for p in L.starters(save, me)}
+    custom = bool((save.get("lineup") or {}).get("minutes"))
+    e = discord.Embed(title=f"🧩 {cba.TEAMS[me].name} rotation", color=E.color(me))
+    lines = []
+    for p in sorted(L.roster(save, me), key=lambda p: (p["id"] not in five, -mins.get(p["id"], 0), -p["ovr"])):
+        exp = chem.expected_minutes(save, me, p)
+        mood = "😠" if p.get("wants_out") else "😕" if p.get("morale", 70) < 45 else ""
+        flag = " ⚠️ wants more" if mins.get(p["id"], 0) <= exp - 8 and p["ovr"] >= 70 else ""
+        lm = " 💤 rests B2Bs" if sim.load_managed(p) and (save.get("lineup") or {}).get("rest_b2b", True) else ""
+        star = "⭐ " if p["id"] in five else ""
+        lines.append(f"{star}`{mins.get(p['id'], 0):>2} min` **{p['name']}** {p['pos']} · {p['ovr']}{badge_inj(p)}{mood}{flag}{lm}")
+    e.description = "\n".join(lines)
+    total = sum(mins.values())
+    e.add_field(name="Settings", value=(
+        f"{'Custom minutes' if custom else 'Coach decides (auto)'} · {total}/240 minutes\n"
+        f"Chemistry: {chem.label(chem.value(save, me))} ({chem.value(save, me):.0f}) · "
+        f"Load management: {'on' if (save.get('lineup') or {}).get('rest_b2b', True) else 'off'}"), inline=False)
+    if note:
+        e.add_field(name="Update", value=note[:1024], inline=False)
+    e.set_footer(text="Players who get well under the minutes their level deserves get unhappy and can request a trade. "
+                      "Over 36 minutes adds fatigue and injury risk.")
+    return e
+
+
+def badge_inj(p: dict) -> str:
+    return " 🚑" if p.get("out", 0) > 0 else ""
+
+
+class MinutesModal(discord.ui.Modal):
+    def __init__(self, view: "LineupView", p: dict, current: int):
+        super().__init__(title=f"Minutes: {p['name']}"[:45])
+        self.view_ref = view
+        self.pid = p["id"]
+        self.mins = discord.ui.TextInput(label="Minutes per game (0-42)", default=str(current), max_length=2)
+        self.add_item(self.mins)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        try:
+            m = max(0, min(42, int(str(self.mins.value).strip())))
+        except ValueError:
+            return await interaction.response.send_message("Use a number from 0 to 42.", ephemeral=True)
+        await self.view_ref.set_minutes(interaction, self.pid, m)
+
+
+class LineupView(OwnerView):
+    def __init__(self, cog: "Rebuild", user_id: int, save: dict):
+        super().__init__(cog, user_id)
+        self.build(save)
+
+    def build(self, save: dict) -> None:
+        self.clear_items()
+        me = save["team"]
+        ros = L.roster(save, me)[:25]
+        five = {p["id"] for p in L.starters(save, me)}
+        s1 = discord.ui.Select(placeholder="Choose your 5 starters", min_values=5, max_values=5, row=0,
+                               options=[discord.SelectOption(label=f"{p['name']} ({p['pos']}, {p['ovr']})"[:100],
+                                                             value=p["id"], default=p["id"] in five) for p in ros])
+        s1.callback = self._starters
+        self.add_item(s1)
+        mins = L.minutes(save, me, healthy_only=False)
+        s2 = discord.ui.Select(placeholder="Change a player's minutes", row=1,
+                               options=[discord.SelectOption(label=f"{p['name']}: {mins.get(p['id'], 0)} min"[:100],
+                                                             value=p["id"]) for p in ros])
+        s2.callback = self._pick_minutes
+        self.add_item(s2)
+        auto = discord.ui.Button(label="Let the coach decide (auto)", emoji="🔄", style=discord.ButtonStyle.secondary, row=2)
+        auto.callback = self._auto
+        self.add_item(auto)
+        on = (save.get("lineup") or {}).get("rest_b2b", True)
+        lm = discord.ui.Button(label=f"Load management: {'on' if on else 'off'}", emoji="💤",
+                               style=discord.ButtonStyle.secondary, row=2)
+        lm.callback = self._toggle_lm
+        self.add_item(lm)
+
+    def _ensure_custom(self, save: dict) -> dict:
+        lu = save.setdefault("lineup", {})
+        if not lu.get("minutes"):
+            lu["minutes"] = dict(L.minutes(save, save["team"], healthy_only=False))
+        return lu
+
+    async def _update(self, interaction, save, note):
+        await self.cog.persist(save, interaction)
+        self.build(save)
+        await interaction.response.edit_message(embed=lineup_embed(save, note), view=self)
+
+    async def _starters(self, interaction: discord.Interaction) -> None:
+        async with self.cog.lock(self.user_id):
+            save = await self.cog.get_save(self.user_id)
+            lu = self._ensure_custom(save)
+            lu["starters"] = list(interaction.data["values"])
+            for pid in lu["starters"]:
+                lu["minutes"][pid] = max(lu["minutes"].get(pid, 0), 24)
+            note = _rebalance(save)
+            await self._update(interaction, save, "Starters set. " + note)
+
+    async def _pick_minutes(self, interaction: discord.Interaction) -> None:
+        save = await self.cog.get_save(self.user_id)
+        pid = interaction.data["values"][0]
+        cur = L.minutes(save, save["team"], healthy_only=False).get(pid, 0)
+        await interaction.response.send_modal(MinutesModal(self, save["players"][pid], cur))
+
+    async def set_minutes(self, interaction: discord.Interaction, pid: str, m: int) -> None:
+        async with self.cog.lock(self.user_id):
+            save = await self.cog.get_save(self.user_id)
+            lu = self._ensure_custom(save)
+            lu["minutes"][pid] = m
+            note = _rebalance(save, keep=pid)
+            await self._update(interaction, save, f"{save['players'][pid]['name']} set to {m} minutes. {note}")
+
+    async def _auto(self, interaction: discord.Interaction) -> None:
+        async with self.cog.lock(self.user_id):
+            save = await self.cog.get_save(self.user_id)
+            lu = save.setdefault("lineup", {})
+            lu["minutes"], lu["starters"] = {}, []
+            await self._update(interaction, save, "Back to the coach's rotation.")
+
+    async def _toggle_lm(self, interaction: discord.Interaction) -> None:
+        async with self.cog.lock(self.user_id):
+            save = await self.cog.get_save(self.user_id)
+            lu = save.setdefault("lineup", {})
+            lu["rest_b2b"] = not lu.get("rest_b2b", True)
+            await self._update(interaction, save, "Load management " + ("on: old and injury-prone stars sit back-to-backs."
+                                                                         if lu["rest_b2b"] else "off: everyone plays every night."))
+
+
+def _rebalance(save: dict, keep: str | None = None) -> str:
+    """Keep the rotation at 240 minutes by trimming/adding to the bench, never the player just set."""
+    lu = save["lineup"]
+    mins = lu["minutes"]
+    ros = [p["id"] for p in L.roster(save, save["team"])]
+    for pid in list(mins):
+        if pid not in ros:
+            del mins[pid]
+    total = sum(mins.values())
+    order = sorted(ros, key=lambda i: save["players"][i]["ovr"])  # adjust the deep bench first
+    diff = 240 - total
+    for pid in (order if diff < 0 else list(reversed(order))):
+        if diff == 0:
+            break
+        if pid == keep:
+            continue
+        cur = mins.get(pid, 0)
+        new = max(0, min(36, cur + diff))
+        diff -= new - cur
+        mins[pid] = new
+    return "" if diff == 0 else f"⚠️ Couldn't balance to 240 ({240 - diff} set); the sim fills or trims the rest."
+
+
+def coach_embed(save: dict, note: str | None = None) -> discord.Embed:
+    me = save["team"]
+    c = coaches.coach(save, me)
+    e = discord.Embed(title=f"🧑‍💼 {cba.TEAMS[me].name} head coach", color=E.color(me))
+    if c:
+        rec = f"{c['w']}-{c['l']} with the team" + (f" · 🏆×{c['titles']}" if c.get("titles") else "")
+        e.description = (f"**{c['name']}** · {coaches.rating(c)} overall{' (interim)' if c.get('interim') else ''}\n"
+                         f"Offense {c['off']} · Defense {c['def']} · Player development {c['dev']}\n{rec}")
+        hist = save.get("history") or []
+        if hist and not c.get("interim"):
+            last = hist[-1]
+            hot = "🔥 Hot seat" if last["result"] in ("Missed playoffs", "Lost in Play-In") and coaches.rating(c) < 80 else ""
+            if hot:
+                e.description += f"\n{hot}: ownership expected more than {last['record']}."
+    avail = coaches.available(save)[:10]
+    e.add_field(name="Available coaches", value="\n".join(
+        f"`{coaches.rating(x)}` **{x['name']}** · O {x['off']} / D {x['def']} / Dev {x['dev']}"
+        + (f" · _{x['note']}_" if x.get("note") else "") for x in avail)[:1024] or "Nobody available.", inline=False)
+    if note:
+        e.add_field(name="Update", value=note[:1024], inline=False)
+    e.set_footer(text="Coaches add a few wins (or cost a few) and speed up young players' development.")
+    return e
+
+
+class CoachView(OwnerView):
+    def __init__(self, cog: "Rebuild", user_id: int, save: dict):
+        super().__init__(cog, user_id)
+        self.build(save)
+
+    def build(self, save: dict) -> None:
+        self.clear_items()
+        avail = coaches.available(save)[:25]
+        if avail:
+            sel = discord.ui.Select(placeholder="Hire a coach", row=0, options=[
+                discord.SelectOption(label=f"{c['name']} ({coaches.rating(c)})"[:100], value=c["name"],
+                                     description=f"O {c['off']} / D {c['def']} / Dev {c['dev']} · age {c.get('age', '?')}"[:100])
+                for c in avail])
+            sel.callback = self._hire
+            self.add_item(sel)
+        c = coaches.coach(save, save["team"])
+        if c and not c.get("interim"):
+            b = discord.ui.Button(label=f"Fire {c['name']}", emoji="🔥", style=discord.ButtonStyle.danger, row=1)
+            b.callback = self._fire
+            self.add_item(b)
+
+    async def _fire(self, interaction: discord.Interaction) -> None:
+        async with self.cog.lock(self.user_id):
+            save = await self.cog.get_save(self.user_id)
+            msg = coaches.fire(save, save["team"])
+            await self.cog.persist(save, interaction)
+            self.build(save)
+            await interaction.response.edit_message(embed=coach_embed(save, msg), view=self)
+
+    async def _hire(self, interaction: discord.Interaction) -> None:
+        async with self.cog.lock(self.user_id):
+            save = await self.cog.get_save(self.user_id)
+            ok, msg = coaches.hire(save, save["team"], interaction.data["values"][0])
+            await self.cog.persist(save, interaction)
+            self.build(save)
+            await interaction.response.edit_message(embed=coach_embed(save, msg), view=self)
+
+
 class ConfirmView(OwnerView):
-    def __init__(self, cog, user_id, on_yes):
+    def __init__(self, cog, user_id, on_yes, yes_label: str = "Yes, start over"):
         super().__init__(cog, user_id)
         self.on_yes = on_yes
+        yes = discord.ui.Button(label=yes_label[:80], style=discord.ButtonStyle.danger)
+        no = discord.ui.Button(label="Cancel", style=discord.ButtonStyle.secondary)
+        yes.callback = self._yes
+        no.callback = self._no
+        self.add_item(yes)
+        self.add_item(no)
 
-    @discord.ui.button(label="Yes, start over", style=discord.ButtonStyle.danger)
-    async def yes(self, interaction: discord.Interaction, _):
+    async def _yes(self, interaction: discord.Interaction):
         self.stop()
         await self.on_yes(interaction)
 
-    @discord.ui.button(label="Keep my save", style=discord.ButtonStyle.secondary)
-    async def no(self, interaction: discord.Interaction, _):
+    async def _no(self, interaction: discord.Interaction):
         self.stop()
-        await interaction.response.edit_message(content="Kept your current save.", embed=None, view=None)
+        await interaction.response.edit_message(content="Never mind, nothing changed.", embed=None, view=None)
 
 
 # ------------------------------------------------------------------------------------------
@@ -524,12 +913,16 @@ class Rebuild(commands.Cog):
         self.last_league = 0.0
         self.last_rumors = 0.0
         self.loading = False
+        self.raw: dict | None = None
+        self.extras: dict = {}
+        self.last_extras = 0.0
+        self.extras_task: asyncio.Task | None = None
 
     # --- lifecycle ---
     async def cog_load(self) -> None:
         await self.store.init()
         self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=40))
-        cached = await self.store.get_cache("live_league_v2")
+        cached = await self.store.get_cache(LIVE_KEY)
         if cached:
             try:
                 self.live = L.unpack(cached[0])
@@ -538,6 +931,13 @@ class Rebuild(commands.Cog):
                 log.info("Loaded cached league (%d players)", len(self.live["players"]))
             except Exception:
                 log.exception("Cached league unreadable")
+        cached = await self.store.get_cache(EXTRAS_KEY)
+        if cached:
+            try:
+                self.extras = L.unpack(cached[0])
+                self.last_extras = cached[1]
+            except Exception:
+                log.exception("Cached contracts/ratings unreadable")
         cached = await self.store.get_cache("rumors")
         if cached and self.live:
             try:
@@ -548,26 +948,60 @@ class Rebuild(commands.Cog):
 
     async def cog_unload(self) -> None:
         self.refresh.cancel()
+        if self.extras_task:
+            self.extras_task.cancel()
         if self.session:
             await self.session.close()
+
+    async def rebuild_live(self) -> None:
+        if not self.raw:
+            return
+        live = await asyncio.to_thread(league_from, self.raw, self.extras)
+        self.live = live
+        self.feed.set_players(live["players"])
+        await self.store.put_cache(LIVE_KEY, L.pack(live))
+
+    async def refresh_extras(self) -> None:
+        """Real contracts (Basketball-Reference) and NBA 2K27 ratings. Slow and polite, so it runs
+        in the background a couple of times a day."""
+        try:
+            contracts = await fetch_contracts(self.session)
+            known = {name_key(p["name"]) for p in (self.live or {}).get("players", {}).values()}
+            ratings = await fetch_2k(self.session, known)
+            changed = False
+            if len(contracts) >= 20:
+                self.extras["contracts"] = contracts
+                changed = True
+            if len(ratings) >= 250:
+                self.extras["ratings"] = ratings
+                changed = True
+            self.last_extras = time.time()
+            if changed:
+                await self.store.put_cache(EXTRAS_KEY, L.pack(self.extras))
+                await self.rebuild_live()
+        except Exception:
+            log.exception("Contract/ratings refresh failed")
+            self.last_extras = time.time() - EXTRAS_REFRESH_SECS + 1800
 
     @tasks.loop(minutes=2)
     async def refresh(self) -> None:
         now = time.time()
-        if now - self.last_league >= LEAGUE_REFRESH_SECS or self.live is None:
+        if self.raw is None or now - self.last_league >= LEAGUE_REFRESH_SECS:
             self.loading = True
             try:
-                live = await fetch_league(self.session)
-                if live:
-                    self.live = live
-                    self.feed.set_players(live["players"])
-                    await self.store.put_cache("live_league_v2", L.pack(live))
-                self.last_league = now if live else now - LEAGUE_REFRESH_SECS + 300
+                raw = await fetch_espn(self.session)
+                if raw:
+                    self.raw = raw
+                    await self.rebuild_live()
+                self.last_league = now if raw else now - LEAGUE_REFRESH_SECS + 300
             except Exception:
                 log.exception("League refresh failed")
                 self.last_league = now - LEAGUE_REFRESH_SECS + 300
             finally:
                 self.loading = False
+        if self.raw and now - self.last_extras >= EXTRAS_REFRESH_SECS and not (
+                self.extras_task and not self.extras_task.done()):
+            self.extras_task = asyncio.create_task(self.refresh_extras())
         if self.live and now - self.last_rumors >= RUMOR_REFRESH_SECS:
             self.last_rumors = now
             try:
@@ -730,6 +1164,10 @@ class Rebuild(commands.Cog):
         if save["phase"] == "draft":
             return await interaction.response.send_message("Trades open back up after the draft. Finish it with `/rebuild sim`.",
                                                            ephemeral=True)
+        if save["phase"] == "stretch":
+            return await interaction.response.send_message(
+                "The trade deadline has passed. Trades reopen after the playoffs. You can still sign free agents "
+                "(`/rebuild freeagents`).", ephemeral=True)
         t = ai.Trade(save["team"], abbr)
         if target and target in save["players"] and save["players"][target].get("team") == abbr:
             t.b_out = [f"p:{target}"]
@@ -861,6 +1299,185 @@ class Rebuild(commands.Cog):
             e.title = f"{cba.TEAMS[save['team']].full} · {L.PHASES[ph]}"
         await interaction.response.send_message(embed=e, view=v)
         v.message = await interaction.original_response()
+
+    @rebuild.command(name="freeagents", description="Free agents you can sign right now, and make them offers")
+    async def freeagents(self, interaction: discord.Interaction) -> None:
+        save = await self.need_save(interaction)
+        if not save:
+            return
+        if save["phase"] == "draft":
+            return await interaction.response.send_message("Finish the draft first (`/rebuild sim`).", ephemeral=True)
+        if save["phase"] == "resign":
+            return await interaction.response.send_message(
+                "Re-sign your own players first, then open free agency from `/rebuild sim`.", ephemeral=True)
+        intro = ("Pick a player to make an offer (salary and years). In the offseason, stars weigh offers and decide "
+                 "at the end of each day." if save["phase"] == "fa" else
+                 "These players are unsigned. Make an offer and they'll answer right away.")
+        v = FAView(self, interaction.user.id, save)
+        await interaction.response.send_message(embed=fa_embed(save, intro), view=v)
+        v.message = await interaction.original_response()
+
+    @rebuild.command(name="release", description="Waive one of your players (his remaining money stays on your cap)")
+    async def release(self, interaction: discord.Interaction, player: str) -> None:
+        save = await self.need_save(interaction)
+        if not save:
+            return
+        p = save["players"].get(player) or self._find_player(save, player)
+        if not p or p.get("team") != save["team"]:
+            return await interaction.response.send_message("Pick one of your own players.", ephemeral=True)
+        dead = sum(p.get("salary") or []) if not p.get("twoway") else 0
+
+        async def do(inter: discord.Interaction) -> None:
+            async with self.lock(inter.user.id):
+                s2 = await self.get_save(inter.user.id)
+                msg = fa.release(s2, p["id"])
+                await self.persist(s2, inter)
+            await inter.response.edit_message(content=msg, view=None)
+
+        v = ConfirmView(self, interaction.user.id, do, yes_label=f"Release {p['name']}")
+        await interaction.response.send_message(
+            f"Release **{p['name']}**? {cba.money(dead)} would stay on your books as dead money." if dead
+            else f"Release **{p['name']}**?", view=v, ephemeral=True)
+
+    @release.autocomplete("player")
+    async def _release_ac(self, interaction, current):
+        return await self.player_choices(interaction, current, mine_only=True)
+
+    @rebuild.command(name="lineup", description="Set your starters and minutes, and load management")
+    async def lineup(self, interaction: discord.Interaction) -> None:
+        save = await self.need_save(interaction)
+        if not save:
+            return
+        v = LineupView(self, interaction.user.id, save)
+        await interaction.response.send_message(embed=lineup_embed(save), view=v)
+        v.message = await interaction.original_response()
+
+    @rebuild.command(name="coach", description="Your head coach: fire him or hire a real available coach")
+    async def coach(self, interaction: discord.Interaction) -> None:
+        save = await self.need_save(interaction)
+        if not save:
+            return
+        v = CoachView(self, interaction.user.id, save)
+        await interaction.response.send_message(embed=coach_embed(save), view=v)
+        v.message = await interaction.original_response()
+
+    @rebuild.command(name="injuries", description="Injury report: who's hurt now and the season's injuries")
+    @app_commands.describe(team="Only this team (leave empty for the whole league)")
+    @app_commands.autocomplete(team=team_autocomplete)
+    async def injuries(self, interaction: discord.Interaction, team: str | None = None) -> None:
+        save = await self.need_save(interaction)
+        if not save:
+            return
+        abbr = cba.find_team(team) if team else None
+        hurt = [p for p in save["players"].values() if p.get("team") and (p.get("out", 0) > 0 or p.get("out_carry"))
+                and (not abbr or p["team"] == abbr)]
+        hurt.sort(key=lambda p: -p["ovr"])
+        e = discord.Embed(title="🚑 Injury report" + (f" · {cba.TEAMS[abbr].name}" if abbr else ""), color=E.ACCENT)
+        e.description = "\n".join(
+            f"`{p['ovr']}` **{p['name']}** {p['team']} · {p.get('inj') or 'Injured'}"
+            + (" · ⚠️ career-altering" if p.get("altered") else "") for p in hurt[:20]) or "Nobody is hurt right now."
+        log_rows = [r for r in save.get("inj_log", []) if not abbr or r["team"] == abbr][:10]
+        if log_rows:
+            e.add_field(name="This season", value="\n".join(
+                f"{r['date']} · {r['name']} ({r['team']}): {r['injury']}, {r['games']} games"
+                + (" · lost a step for good" if r.get("altered") else "") for r in log_rows)[:1024], inline=False)
+        e.set_footer(text="Injury-prone players get hurt more; iron men rarely miss games. Old and fragile stars rest back-to-backs.")
+        await interaction.response.send_message(embed=e)
+
+    @rebuild.command(name="stats", description="League leaders, or a team's season stats")
+    @app_commands.describe(team="Show this team's stats (leave empty for league leaders)")
+    @app_commands.autocomplete(team=team_autocomplete)
+    async def stats_cmd(self, interaction: discord.Interaction, team: str | None = None) -> None:
+        save = await self.need_save(interaction)
+        if not save:
+            return
+        abbr = cba.find_team(team) if team else None
+        label = cba.season_label(save["season"])
+        if abbr:
+            e = discord.Embed(title=f"📊 {cba.TEAMS[abbr].full} · {label}", color=E.color(abbr))
+            rows = [p for p in L.roster(save, abbr) if stats_mod.line(p)]
+            rows.sort(key=lambda p: -stats_mod.line(p)["pts"])
+            e.description = "\n".join(f"**{p['name']}** · {stats_mod.card_line(p)}" for p in rows)[:4000] or \
+                "No games played yet this season."
+        else:
+            e = discord.Embed(title=f"📊 League leaders · {label}", color=E.ACCENT)
+            for key, name in (("pts", "Points"), ("reb", "Rebounds"), ("ast", "Assists"), ("stl", "Steals"),
+                              ("blk", "Blocks"), ("tpm", "3-pointers made")):
+                rows = stats_mod.leaders(save, key)
+                if rows:
+                    e.add_field(name=name, value="\n".join(f"{p['name']} ({p['team']}) **{v}**" for p, v in rows),
+                                inline=True)
+            if not e.fields:
+                e.description = "No games played yet this season. Sim some games with `/rebuild sim`."
+            aw = save.get("awards")
+            if aw:
+                e.add_field(name="🏅 Awards", value="\n".join(f"**{k}:** {v}" for k, v in aw.items())[:1024], inline=False)
+        await interaction.response.send_message(embed=e)
+
+    @rebuild.command(name="extend", description="Extend players in the last year of their contracts")
+    async def extend(self, interaction: discord.Interaction) -> None:
+        save = await self.need_save(interaction)
+        if not save:
+            return
+        if save["phase"] in ("draft", "resign", "fa"):
+            return await interaction.response.send_message(
+                "Extensions open again once next season's contracts kick in (after free agency).", ephemeral=True)
+        v = ExtendView(self, interaction.user.id, save)
+        await interaction.response.send_message(embed=v.embed(save), view=v)
+        v.message = await interaction.original_response()
+
+    @rebuild.command(name="draftboard", description="Scouting board for this season's draft class")
+    async def draftboard(self, interaction: discord.Interaction) -> None:
+        save = await self.need_save(interaction)
+        if not save:
+            return
+        at_draft = save["phase"] == "draft"
+        prospects = (save.get("draft") or {}).get("prospects") if at_draft else draft_mod.ensure_class(save, random.Random())
+        e = discord.Embed(title=f"🎟️ {save['season']} NBA Draft big board", color=E.color(save["team"]))
+        lines = []
+        for p in (prospects or [])[:15]:
+            lines.append(f"`{p['big_board']:>2}` **{p['name']}** {p['pos']} · {p.get('school', '')} · {p['age']}\n"
+                         f"  {draft_mod.projection(save, p, precise=at_draft)}")
+        e.description = "\n".join(lines)[:4000] or "No prospects."
+        mine = draft_mod.my_projected_picks(save)
+        e.add_field(name="Your picks this year", value="\n".join(mine) or "You don't own a pick in this draft.", inline=False)
+        e.set_footer(text=("Draft-day scouting: tighter ranges. " if at_draft else
+                           "Early read only: full workouts and interviews happen before the draft. ")
+                          + "Not every prospect hits; some top picks bust and some late picks become stars.")
+        await interaction.response.send_message(embed=e)
+
+    @rebuild.command(name="teamstats", description="What a team is averaging this season, with league ranks")
+    @app_commands.describe(team="Leave empty for your own team")
+    @app_commands.autocomplete(team=team_autocomplete)
+    async def teamstats(self, interaction: discord.Interaction, team: str | None = None) -> None:
+        save = await self.need_save(interaction)
+        if not save:
+            return
+        abbr = cba.find_team(team) if team else save["team"]
+        if not abbr:
+            return await interaction.response.send_message("I don't know that team.", ephemeral=True)
+        t = stats_mod.team_line(save, abbr)
+        e = discord.Embed(title=f"📊 {cba.TEAMS[abbr].full} · {cba.season_label(save['season'])}", color=E.color(abbr))
+        if not t:
+            e.description = "No games played yet this season. Sim some games with `/rebuild sim`."
+            return await interaction.response.send_message(embed=e)
+        w, l = L.record(save, abbr)
+        rk = lambda key, rev=True: stats_mod.team_ranks(save, key, rev).get(abbr, "?")
+        ordinal = lambda n: f"{n}{'th' if 11 <= n % 100 <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}" \
+            if isinstance(n, int) else "?"
+        e.description = (f"**{w}-{l}** · {t['g']} games · Net rating **{t['net']:+.1f}** ({ordinal(rk('net'))})\n"
+                         f"{style.identity(save, abbr)}")
+        e.add_field(name="Offense", value=(f"{t['pts']} PPG ({ordinal(rk('pts'))})\n{t['ast']} APG ({ordinal(rk('ast'))})\n"
+                                           f"{t['tpm']} 3PM ({ordinal(rk('tpm'))})"), inline=True)
+        e.add_field(name="Defense", value=(f"{t['opp']} opp PPG ({ordinal(rk('opp', False))})\n{t['stl']} SPG "
+                                           f"({ordinal(rk('stl'))})\n{t['blk']} BPG ({ordinal(rk('blk'))})"), inline=True)
+        e.add_field(name="Boards", value=f"{t['reb']} RPG ({ordinal(rk('reb'))})", inline=True)
+        top = sorted((p for p in L.roster(save, abbr) if stats_mod.line(p)), key=lambda p: -stats_mod.line(p)["pts"])[:5]
+        if top:
+            e.add_field(name="Leading scorers", value="\n".join(
+                f"**{p['name']}** {stats_mod.line(p)['pts']} PTS · {stats_mod.line(p)['reb']} REB · {stats_mod.line(p)['ast']} AST"
+                for p in top), inline=False)
+        await interaction.response.send_message(embed=e)
 
     @rebuild.command(name="standings", description="Conference standings (or power rankings before tip-off)")
     async def standings(self, interaction: discord.Interaction) -> None:

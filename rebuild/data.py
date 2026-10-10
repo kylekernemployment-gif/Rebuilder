@@ -130,8 +130,9 @@ def parse_roster(roster_json: dict, abbr: str, season: int) -> list[dict]:
     return players
 
 
-def parse_stats_page(page_json: dict) -> tuple[dict[str, dict], int]:
-    """{athlete id: per-game stat dict} for one page, plus the total page count."""
+def parse_stats_page(page_json: dict, meta: dict | None = None) -> tuple[dict[str, dict], int]:
+    """{athlete id: per-game stat dict} for one page, plus the total page count.
+    If `meta` is given, also records each athlete's name/age/position (for free agents)."""
     names_by_cat = {c.get("name"): c.get("names") or [] for c in page_json.get("categories") or []}
     out: dict[str, dict] = {}
     for row in page_json.get("athletes") or []:
@@ -151,33 +152,124 @@ def parse_stats_page(page_json: dict) -> tuple[dict[str, dict], int]:
                         pass
         if s.get("gp"):
             out[pid] = s
+            if meta is not None and ath.get("displayName"):
+                pos = ath.get("position")
+                pos = (pos.get("abbreviation") if isinstance(pos, dict) else pos) or ""
+                meta[pid] = {"name": ath["displayName"], "age": ath.get("age"), "pos": pos,
+                             "headshot": ((ath.get("headshot") or {}).get("href") or ""),
+                             "team_id": ath.get("teamId")}
     pages = int((page_json.get("pagination") or {}).get("pages") or 1)
     return out, pages
 
 
-def build_league(rosters: dict[str, list[dict]], stats: dict[int, dict[str, dict]], season: int) -> dict:
-    """Combine rosters + stats into the league snapshot every new save starts from."""
+def _apply_contracts(players: dict[str, dict], contracts: dict[str, dict[str, dict]]) -> int:
+    """Overwrite ESPN contract numbers with Basketball-Reference's (newer and complete)."""
+    from .sources import name_key
+    hits = 0
+    by_name: dict[str, list[dict]] = {}
+    for abbr, rows in contracts.items():
+        for key, row in rows.items():
+            by_name.setdefault(key, []).append({**row, "team": abbr})
+    for p in players.values():
+        rows = by_name.get(name_key(p["name"]))
+        if not rows:
+            continue
+        row = next((r for r in rows if r["team"] == p.get("team")), rows[0] if len(rows) == 1 else None)
+        if not row:
+            continue
+        sal = row["salary"]
+        if sal and sal[0] >= 1_150_000:
+            p["salary"] = list(sal)
+            p["twoway"] = False
+            p["est"] = False
+            p["src"] = "bbref"
+            hits += 1
+    return hits
+
+
+def _apply_2k(players: dict[str, dict], ratings: dict[str, int]) -> int:
+    """Use NBA 2K27 overalls where we have them; re-scale our own ratings for everyone else."""
+    from .sources import name_key
+    from .ratings import potential
+    pairs = []
+    for p in players.values():
+        r = ratings.get(name_key(p["name"]))
+        if r:
+            pairs.append((p["ovr"], r))
+    a, b = 1.0, 0.0
+    if len(pairs) >= 30:
+        n = len(pairs)
+        mx = sum(x for x, _ in pairs) / n
+        my = sum(y for _, y in pairs) / n
+        var = sum((x - mx) ** 2 for x, _ in pairs)
+        if var > 0:
+            a = sum((x - mx) * (y - my) for x, y in pairs) / var
+            b = my - a * mx
+    hits = 0
+    for pid, p in players.items():
+        r = ratings.get(name_key(p["name"]))
+        if r:
+            p["ovr"] = r
+            p["ovr_src"] = "2K27"
+            hits += 1
+        elif pairs:
+            p["ovr"] = int(max(40, min(99, round(a * p["ovr"] + b))))
+        p["pot"] = potential(p["ovr"], p.get("age", 25), pid)
+    return hits
+
+
+def build_league(rosters: dict[str, list[dict]], stats: dict[int, dict[str, dict]], season: int,
+                 meta: dict | None = None, extras: dict | None = None) -> dict:
+    """Combine rosters + stats (+ real contracts and 2K ratings) into the league snapshot."""
+    import copy
+    extras = extras or {}
     players: dict[str, dict] = {}
     for abbr, plist in rosters.items():
         for p in plist:
-            p = dict(p)
+            p = copy.deepcopy(p)
             hist = {str(yr): stats[yr][p["id"]] for yr in sorted(stats) if p["id"] in stats[yr]}
             p["hist"] = hist
             last = hist[max(hist)] if hist else None
-            p["pos"] = _position(p.pop("espn_pos", ""), last)
+            p["pos"] = _position(p.get("espn_pos", ""), last)
+            p.pop("espn_pos", None)
+            tid = (meta or {}).get(p["id"], {}).get("team_id")
+            try:
+                p["prev_team"] = cba.BY_ESPN_ID.get(int(tid)) if tid else None
+            except (TypeError, ValueError):
+                p["prev_team"] = None
             players[p["id"]] = p
+    # Real free agents: played last season, not on any roster now.
+    fa_ids = []
+    last_year = max((y for y in stats if y < season), default=None)
+    for pid, m in (meta or {}).items():
+        if pid in players or last_year is None or pid not in stats.get(last_year, {}):
+            continue
+        if stats[last_year][pid].get("gp", 0) < 15 or (m.get("age") or 30) > 38:
+            continue
+        hist = {str(yr): stats[yr][pid] for yr in sorted(stats) if pid in stats[yr]}
+        players[pid] = {"id": pid, "name": m["name"], "team": None, "age": int(m.get("age") or 28),
+                        "exp": 5, "salary": [], "inj": None, "jersey": "", "headshot": m.get("headshot", ""),
+                        "status": "active", "hist": hist,
+                        "pos": _position(m.get("pos", ""), hist[max(hist)])}
+        fa_ids.append(pid)
+    n_contracts = _apply_contracts(players, extras.get("contracts") or {})
     rate_league(players, season)
+    n_2k = _apply_2k(players, extras.get("ratings") or {}) if extras.get("ratings") else 0
     from .ai import market_salary
     for p in players.values():
-        if p.get("est"):
+        if p.get("est") and p.get("team"):
             amt = int(round(market_salary(p["ovr"], season), -5))
             yrs = 4 if p["age"] <= 26 else 3 if p["age"] <= 30 else 2
             p["salary"] = [int(amt * 1.05 ** i) for i in range(yrs)]
+    if n_contracts or n_2k:
+        log.info("Applied %d Basketball-Reference contracts and %d NBA 2K27 ratings", n_contracts, n_2k)
     return {
         "season": season,
         "fetched": int(time.time()),
         "players": players,
         "teams": {abbr: [p["id"] for p in plist] for abbr, plist in rosters.items()},
+        "fa": fa_ids,
+        "sources": {"contracts": n_contracts, "ratings": n_2k},
     }
 
 
@@ -218,7 +310,7 @@ def current_season(now: float | None = None) -> int:
     return t.tm_year + 1 if t.tm_mon >= 8 else t.tm_year
 
 
-async def fetch_stats(session: aiohttp.ClientSession, year: int) -> dict[str, dict]:
+async def fetch_stats(session: aiohttp.ClientSession, year: int, meta: dict | None = None) -> dict[str, dict]:
     params = {"region": "us", "lang": "en", "contentorigin": "espn", "isqualified": "false",
               "limit": 300, "sort": "offensive.avgPoints:desc", "season": year, "seasontype": 2}
     out: dict[str, dict] = {}
@@ -227,13 +319,14 @@ async def fetch_stats(session: aiohttp.ClientSession, year: int) -> dict[str, di
         data = await _get(session, STATS_URL, {**params, "page": page})
         if not data:
             break
-        got, pages = parse_stats_page(data)
+        got, pages = parse_stats_page(data, meta)
         out.update(got)
         page += 1
     return out
 
 
-async def fetch_league(session: aiohttp.ClientSession) -> dict | None:
+async def fetch_espn(session: aiohttp.ClientSession) -> dict | None:
+    """Raw ESPN data: rosters, stats and player info. Fast (about 20 seconds)."""
     season = current_season()
     rosters: dict[str, list[dict]] = {}
     sem = asyncio.Semaphore(3)
@@ -249,14 +342,25 @@ async def fetch_league(session: aiohttp.ClientSession) -> dict | None:
     if len(rosters) < 30:
         log.error("Only got %d/30 rosters from ESPN; keeping the previous snapshot", len(rosters))
         return None
-    stats = {}
+    stats: dict[int, dict] = {}
+    meta: dict[str, dict] = {}
     for yr in (season - 2, season - 1, season):
-        got = await fetch_stats(session, yr)
+        got = await fetch_stats(session, yr, meta if yr == season - 1 else None)
         if got:
             stats[yr] = got
     if not stats:
         log.error("No stats from ESPN; keeping the previous snapshot")
         return None
-    league = build_league(rosters, stats, season)
-    log.info("Fetched live league: %d players, stats seasons %s", len(league["players"]), sorted(stats))
+    return {"season": season, "rosters": rosters, "stats": stats, "meta": meta}
+
+
+def league_from(raw: dict, extras: dict | None = None) -> dict:
+    league = build_league(raw["rosters"], raw["stats"], raw["season"], raw.get("meta"), extras)
+    log.info("Built live league: %d players (%d free agents), stats seasons %s",
+             len(league["players"]), len(league["fa"]), sorted(raw["stats"]))
     return league
+
+
+async def fetch_league(session: aiohttp.ClientSession, extras: dict | None = None) -> dict | None:
+    raw = await fetch_espn(session)
+    return league_from(raw, extras) if raw else None

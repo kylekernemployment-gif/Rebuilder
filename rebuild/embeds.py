@@ -6,7 +6,7 @@ import time
 
 import discord
 
-from . import ai, cba, sim
+from . import ai, cba, chem, coaches, sim, stats, style
 from . import league as L
 from .ratings import ATTRS, grade
 from .rumors import TIER_BADGE
@@ -71,7 +71,10 @@ def team_embed(save: dict, abbr: str) -> discord.Embed:
     title = f"{info.full}" + (" (your team)" if abbr == save["team"] else "")
     e = discord.Embed(title=title, color=color(abbr))
     rec = f" · **{w}-{l}**" if w + l else ""
-    e.description = (f"{ai.MODES[mode]} · Power rank **#{rank}**{rec}\n"
+    c = coaches.coach(save, abbr)
+    coach_txt = f"Coach: **{c['name']}** ({coaches.rating(c)})" if c else ""
+    e.description = (f"{ai.MODES[mode]} · Power rank **#{rank}**{rec}\n{coach_txt} · Chemistry "
+                     f"{chem.label(chem.value(save, abbr))}\n{style.identity(save, abbr)}\n\n"
                      + "\n".join(player_line(save, p) for p in ros))
     std = L.standard_count(save, abbr)
     dead = (save.get("dead") or {}).get(abbr) or []
@@ -95,9 +98,20 @@ def player_embed(save: dict, p: dict) -> discord.Embed:
         e.set_thumbnail(url=p["headshot"])
     where = cba.TEAMS[team].full if team else "Free agent"
     pot = p.get("pot", p["ovr"])
-    e.description = (f"**{p['ovr']} OVR** · {pot} POT · {p['pos']} · Age {p['age']} · {where}"
+    src = " (NBA 2K27)" if p.get("ovr_src") == "2K27" else ""
+    dur = p.get("dur", 0.85)
+    health = ("🛡️ Iron man" if dur >= 0.93 else "✅ Durable" if dur >= 0.82 else "⚠️ Injury concerns" if dur >= 0.65
+              else "🩹 Injury prone")
+    mood = p.get("morale", 70)
+    mood_txt = "😠 Wants out" if p.get("wants_out") else "😕 Unhappy" if mood < 45 else "🙂 Happy" if mood >= 60 else "😐 Content"
+    cy = " · 📝 Contract year" if sim.contract_year(p) else ""
+    e.description = (f"**{p['ovr']} OVR**{src} · {pot} POT · {p['pos']} · Age {p['age']} · {where}\n"
+                     f"{health} · {mood_txt}{cy}"
                      + (f"\nDrafted {p['drafted']}" if p.get("drafted") else "")
-                     + (f"\n🚑 {p['inj']}" if p.get("inj") else ""))
+                     + (f"\n🚑 {p['inj']}" if p.get("inj") else "")
+                     + (f"\n🦵 Career altered by injury: {p['altered']}" if p.get("altered") else ""))
+    if stats.line(p):
+        e.add_field(name=f"{cba.season_label(save['season'])} season (sim)", value=stats.card_line(p), inline=False)
     attrs = " · ".join(f"{ATTRS[k]} **{grade(v)}**" for k, v in p.get("attrs", {}).items())
     if attrs:
         e.add_field(name="Scouting report", value=attrs, inline=False)
@@ -108,7 +122,7 @@ def player_embed(save: dict, p: dict) -> discord.Embed:
             shoot = f" · {line['fg']}% FG"
         if line.get("tp"):
             shoot += f" · {line['tp']}% 3P"
-        e.add_field(name="Recent production (ESPN, weighted)",
+        e.add_field(name="Real production (ESPN, recent seasons)",
                     value=(f"{line['pts']} PTS · {line['reb']} REB · {line['ast']} AST · {line['stl']} STL · "
                            f"{line['blk']} BLK · {line['mpg']} MIN{shoot}"), inline=False)
     sal = p.get("salary") or []
@@ -206,7 +220,11 @@ def season_embed(save: dict, entry: dict) -> discord.Embed:
     if log:
         e.add_field(name="Playoffs", value="\n".join(log[-7:])[:1024], inline=False)
     aw = "\n".join(f"**{k}:** {v}" for k, v in entry["awards"].items())
-    e.add_field(name="Awards", value=aw, inline=False)
+    e.add_field(name="Awards", value=aw[:1024], inline=False)
+    mine = sorted((p for p in L.roster(save, me) if stats.line(p)), key=lambda p: -stats.line(p)["pts"])[:4]
+    if mine:
+        e.add_field(name="Your top players", value="\n".join(f"**{p['name']}** · {stats.card_line(p)}" for p in mine)[:1024],
+                    inline=False)
     return e
 
 
@@ -234,7 +252,9 @@ def welcome_embed(save: dict, live_rumors: list[str]) -> discord.Embed:
             "rebuild": "Ownership is patient: **build a contender within 3 seasons**."}[mode]
     e = discord.Embed(title=f"🏀 Welcome to the {info.full} front office", color=color(me))
     rank = (save.get("ranks") or {}).get(me)
+    c = coaches.coach(save, me)
     e.description = (f"You're the new GM. {goal}\n\nDirection: {ai.MODES[mode]} · Power rank **#{rank}** of 30\n"
+                     f"Coach: **{c['name'] if c else 'none'}** · Chemistry {chem.label(chem.value(save, me))}\n"
                      f"Rosters, contracts and stats are live from ESPN as of <t:{save['data_as_of']}:R>.")
     core = "\n".join(player_line(save, p) for p in L.roster(save, me)[:6])
     e.add_field(name="Your core", value=core, inline=False)
@@ -253,19 +273,20 @@ def welcome_embed(save: dict, live_rumors: list[str]) -> discord.Embed:
 
 HELP = (
     "**Rebuild** puts you in charge of any NBA team using the real, current rosters and contracts.\n\n"
-    "**How it's realistic**\n"
-    "• Rosters, contracts and stats come live from ESPN; ratings come from real production.\n"
-    "• Every AI team has a direction (contending, middle, rebuilding) and values players differently.\n"
-    "• Trades follow the 2026-27 CBA: salary matching, the tax line, both aprons, roster limits and the Stepien rule.\n"
-    "• A live rumor feed (RealGM, ESPN, r/nba insider posts) changes how willing teams are to move players. "
-    "Reports are weighted by reporter credibility (Tier 1 insiders count most) and corroboration. "
-    "Live news shapes your save until your first trade deadline; after that your league is your own.\n"
-    "• Full seasons: injuries, standings, play-in, playoffs, awards, aging, lottery, draft, re-signing with Bird rights, "
-    "free agency with cap space and mid-level exceptions, and dead money when you waive someone.\n\n"
-    "**Commands**\n"
-    "`/rebuild start` pick a team · `/rebuild team` any roster & cap sheet · `/rebuild player` player card\n"
-    "`/rebuild trade` trade builder with a live CBA check and \"What would it take?\"\n"
-    "`/rebuild shop` get offers for one of your players · `/rebuild inbox` offers teams sent you\n"
-    "`/rebuild market` who's on the block · `/rebuild rumors` the live feed\n"
-    "`/rebuild sim` play the season and run the offseason · `/rebuild standings` · `/rebuild history` · `/rebuild leaderboard`"
+    "**Where the data comes from**\n"
+    "• Rosters and stats: ESPN. Contracts: Basketball-Reference (new deals and extensions). Overalls: NBA 2K27 "
+    "(2kratings.com). Rumors: RealGM, ESPN and r/nba insiders. Coaches and the 2027 draft class are real.\n\n"
+    "**Season**\n"
+    "`/rebuild sim` sim a week or a month at a time. It always stops at the trade deadline, and trades lock after it. "
+    "Regular-season awards come out when the season ends, Finals MVP after the Finals.\n"
+    "`/rebuild lineup` starters, minutes, load management · `/rebuild coach` fire/hire real coaches\n"
+    "`/rebuild injuries` · `/rebuild stats` · `/rebuild teamstats` · `/rebuild standings` · `/rebuild draftboard`\n\n"
+    "**Moves**\n"
+    "`/rebuild trade` builder with a live CBA check and \"What would it take?\" · `/rebuild shop` · `/rebuild inbox`\n"
+    "`/rebuild freeagents` negotiate with free agents any time · `/rebuild extend` · `/rebuild release`\n"
+    "`/rebuild market` · `/rebuild rumors` · `/rebuild team` · `/rebuild player`\n\n"
+    "**Realism**\n"
+    "Chemistry builds over a season (champions start high), players unhappy with their minutes can ask out, "
+    "injury-prone players get hurt more and some major injuries change careers, prospects can bust, stars age, "
+    "and AI teams trade at real-world rates (most at the deadline)."
 )

@@ -169,8 +169,24 @@ def test_full_flow_through_commands(cog):
             check_embed(x.last_embed())
             return x
 
+        await press("Sim 1 week")
         await press("Sim to trade deadline")
-        await press("Sim rest of season")
+        save = await cog.get_save(1)
+        assert save["phase"] == "deadline"
+        for cmd in (Rebuild.lineup, Rebuild.coach, Rebuild.freeagents, Rebuild.extend, Rebuild.draftboard):
+            i = FakeInteraction()
+            await cmd.callback(cog, i)
+            check_embed(i.last_embed())
+        await press("Sim to end of season")
+        assert save["phase"] == "stretch" and save.get("awards")
+        i = FakeInteraction()
+        await Rebuild.trade.callback(cog, i, "BOS", None)
+        assert "deadline has passed" in (i.sent[-1][1] or "")
+        for cmd in (Rebuild.injuries, Rebuild.stats_cmd):
+            i = FakeInteraction()
+            await cmd.callback(cog, i, None)
+            check_embed(i.last_embed())
+        await press("Play the playoffs")
         await press("Start offseason")
         save = await cog.get_save(1)
         while save["phase"] == "draft":
@@ -183,9 +199,7 @@ def test_full_flow_through_commands(cog):
             await choose([next(iter(save["asks"]))])
         await press("Open free agency")
         assert save["phase"] == "fa"
-        sel = [c for c in sv.children if isinstance(c, discord.ui.Select)]
-        if sel:
-            await choose([sel[0].options[-1].value])
+        await press("Next free agency day")
         await press("Finish offseason")
         assert save["phase"] == "preseason" and save["season"] == 2028
         i = FakeInteraction()

@@ -6,12 +6,16 @@ from __future__ import annotations
 import math
 import random
 
-from . import ai, cba
+from . import ai, cba, chem, coaches, draft, stats, style
 from . import league as L
 from .ratings import noise, potential
 
 GAMES = 82
-DEADLINE_SHARE = 0.56          # trade deadline falls a bit past halfway
+DEADLINE_SHARE = 0.62          # trade deadline lands in early February
+TOTAL_GAMES = 30 * GAMES // 2
+DEC15 = int(TOTAL_GAMES * 55 / 174)   # game index around December 15
+WEEK = 52                      # league games in a week of the schedule
+SEASON_DAYS = 174              # opening night (late Oct) to the last regular-season game (mid Apr)
 WIN_K = 0.17                   # strength gap -> win probability slope
 HOME_EDGE = 0.22
 LOTTERY_ODDS = [140, 140, 140, 125, 105, 90, 75, 60, 45, 30, 20, 15, 10, 5]
@@ -74,30 +78,112 @@ def schedule(seed: int) -> list[tuple[str, str]]:
 # ------------------------------------------------------------------------------------------
 
 def team_rating(save: dict, abbr: str) -> float:
-    return L.strength(save, abbr, healthy_only=True) + save.get("chem", {}).get(abbr, 0.0)
+    return (L.strength(save, abbr, healthy_only=True) + chem.bonus(save, abbr)
+            + save.get("form", {}).get(abbr, 0.0) + coaches.team_bonus(save, abbr))
+
+
+def deadline_idx() -> int:
+    return int(TOTAL_GAMES * DEADLINE_SHARE)
+
+
+def calendar(save: dict) -> str:
+    """Rough date in the season for the current game index ('Jan 14')."""
+    import datetime
+    idx = save.get("game_idx")
+    if idx is None:
+        return "Preseason"
+    start = datetime.date(save["season"] - 1, 10, 21)
+    d = start + datetime.timedelta(days=int(idx / TOTAL_GAMES * SEASON_DAYS))
+    return d.strftime("%b %-d")
 
 
 def win_prob(r_home: float, r_away: float) -> float:
     return 1 / (1 + math.exp(-(WIN_K * (r_home - r_away) + HOME_EDGE)))
 
 
-def _injury_roll(save: dict, rng: random.Random, abbr: str, news: list[str]) -> None:
-    for p in L.roster(save, abbr)[:10]:
-        if p.get("out", 0) > 0:
+BASE_INJURY = 0.0072     # per player per game; about 10 games missed a season on average
+
+
+def injury_risk(p: dict) -> float:
+    """Durable guys (never miss games) rarely get hurt; injury-prone guys get hurt more; age adds risk.
+    Injury-prone players in a contract year play through some of the small stuff."""
+    dur = p.get("dur", 0.85)
+    prone = 0.4 + 1.9 * (1 - dur) ** 1.15          # ~0.4x for iron men, ~1.5x+ for the most fragile
+    age = 1 + max(0, p["age"] - 30) * 0.07
+    return BASE_INJURY * prone * age
+
+
+def contract_year(p: dict) -> bool:
+    return len(p.get("salary") or []) == 1 and p["age"] >= 24 and not p.get("twoway")
+
+
+def _injury_roll(save: dict, rng: random.Random, abbr: str, news: list[str], minutes: dict | None = None) -> None:
+    mins = minutes or L.minutes(save, abbr)
+    for p in L.roster(save, abbr)[:11]:
+        if p.get("out", 0) > 0 or p.get("rest") or mins.get(p["id"], 0) <= 0:
             continue
-        risk = 0.0045 + max(0, p["age"] - 30) * 0.0006
-        if rng.random() < risk:
-            sev = rng.random()
-            games = rng.randint(1, 4) if sev < 0.6 else rng.randint(5, 15) if sev < 0.9 else rng.randint(20, 70)
-            p["out"] = games
-            p["inj"] = "Out " + (f"{games} games" if games < 40 else "for the season")
-            if games >= 15 and p["ovr"] >= 80:
-                news.append(f"🚑 {p['name']} ({abbr}) will miss about {games} games.")
+        risk = injury_risk(p) * (0.6 + 0.4 * min(mins.get(p["id"], 0), 40) / 30)
+        if mins.get(p["id"], 0) > 38:
+            risk *= 1.25                                 # heavy minutes wear players down
+        if rng.random() >= risk:
+            continue
+        sev = rng.random() - (0.08 if p.get("dur", 0.85) < 0.65 else 0)  # fragile bodies, longer stints
+        if sev < 0.6 and contract_year(p) and p.get("dur", 0.85) < 0.75 and rng.random() < 0.3:
+            continue                                     # playing through it for the next contract
+        name, games, alter = _pick_injury(rng, sev)
+        p["out"] = games
+        p["inj"] = f"{name}, out {games} games" if games < 60 else f"{name}, out for the season"
+        if alter and rng.random() < alter:
+            _career_altering(p, name, rng)
+        if games >= 4:
+            log = save.setdefault("inj_log", [])
+            log.insert(0, {"pid": p["id"], "name": p["name"], "team": abbr, "injury": name, "games": games,
+                           "date": calendar(save), "ovr": p["ovr"], "altered": bool(p.get("altered", "").startswith(name))})
+            del log[80:]
+        if games >= 15 and p["ovr"] >= 78:
+            news.append(f"🚑 {p['name']} ({abbr}): {name.lower()}, expected to miss "
+                        + (f"about {games} games." if games < 60 else "the rest of the season."))
+
+
+INJURIES = {
+    "minor": [("Ankle sprain", 1, 6), ("Sore knee", 1, 4), ("Back spasms", 1, 5), ("Illness", 1, 3),
+              ("Hip contusion", 1, 4), ("Sprained wrist", 1, 5)],
+    "moderate": [("Hamstring strain", 5, 18), ("Calf strain", 6, 20), ("Sprained MCL", 8, 22),
+                 ("Fractured hand", 10, 25), ("Groin strain", 5, 14), ("Bone bruise", 6, 16)],
+    "severe": [("Torn meniscus", 15, 35), ("Fractured foot", 20, 45), ("Torn labrum", 25, 60),
+               ("Stress reaction", 15, 40)],
+}
+MAJOR = [("Torn ACL", 70, 110, 0.30), ("Ruptured Achilles", 80, 120, 0.40)]
+
+
+def _pick_injury(rng: random.Random, sev: float) -> tuple[str, int, float]:
+    """(injury, games out, chance it permanently changes his career)."""
+    if sev >= 0.975:
+        name, lo, hi, alter = rng.choice(MAJOR)
+        return name, rng.randint(lo, hi), alter
+    tier = "minor" if sev < 0.6 else "moderate" if sev < 0.9 else "severe"
+    name, lo, hi = rng.choice(INJURIES[tier])
+    return name, rng.randint(lo, hi), (0.08 if tier == "severe" else 0.0)
+
+
+def _career_altering(p: dict, injury: str, rng: random.Random) -> None:
+    """Some major injuries leave a player noticeably worse for good."""
+    drop = rng.randint(4, 9) if "Achilles" in injury else rng.randint(3, 7) if "ACL" in injury else rng.randint(2, 4)
+    p["ovr"] = max(40, p["ovr"] - drop)
+    p["pot"] = max(p["ovr"], p.get("pot", p["ovr"]) - drop)
+    p["dur"] = round(max(0.3, p.get("dur", 0.85) - 0.08), 3)
+    for k in ("sco", "def"):
+        if k in p.get("attrs", {}):
+            p["attrs"][k] = max(25, p["attrs"][k] - drop)
+    p["altered"] = f"{injury} ({-drop} OVR)"
 
 
 def _tick_injuries(save: dict, abbr: str) -> None:
     for pid in save["rosters"][abbr]:
         p = save["players"][pid]
+        if p.get("rest"):
+            p["rest"] = False
+            p["gp_missed"] = p.get("gp_missed", 0) + 1
         if p.get("out", 0) > 0:
             p["out"] -= 1
             p["gp_missed"] = p.get("gp_missed", 0) + 1
@@ -105,12 +191,43 @@ def _tick_injuries(save: dict, abbr: str) -> None:
                 p["inj"] = None
 
 
-def play_game(save: dict, rng: random.Random, home: str, away: str, news: list[str]) -> str:
-    p = win_prob(team_rating(save, home), team_rating(save, away))
-    winner = home if rng.random() < p else away
+def load_managed(p: dict) -> bool:
+    """Old stars and injury-prone stars sit the second night of back-to-backs."""
+    return p["ovr"] >= 78 and (p["age"] >= 35 or p.get("dur", 0.85) < 0.6)
+
+
+def _rest_for_b2b(save: dict, abbr: str, game_idx: int, playoffs: bool) -> None:
+    if playoffs:
+        return
+    if abbr == save["team"] and not (save.get("lineup") or {}).get("rest_b2b", True):
+        return
+    # roughly 14 back-to-backs a season; second nights are where teams rest guys
+    if (hash((save.get("sched_seed"), abbr, game_idx)) % 100) >= 17:
+        return
+    for p in L.roster(save, abbr)[:8]:
+        if p.get("out", 0) <= 0 and load_managed(p):
+            p["rest"] = True
+
+
+def play_game(save: dict, rng: random.Random, home: str, away: str, news: list[str], playoffs: bool = False) -> str:
+    idx = save.get("game_idx", 0)
     for t in (home, away):
+        _rest_for_b2b(save, t, idx, playoffs)
+    rh = team_rating(save, home) + style.matchup(save, home, away)
+    ra = team_rating(save, away)
+    p = win_prob(rh, ra)
+    winner = home if rng.random() < p else away
+    loser = away if winner == home else home
+    mins = {t: L.minutes(save, t) for t in (home, away)}
+    lines = {t: stats.game_lines(save, t, mins[t], rng) for t in (home, away)}
+    stats.normalize(lines[home], rh, ra, rng)
+    stats.normalize(lines[away], ra, rh, rng)
+    stats.settle_score(lines[winner], lines[loser], rng, rh - ra if winner == home else ra - rh)
+    pts = {t: sum(x["pts"] for x in lines[t].values()) for t in (home, away)}
+    for t in (home, away):
+        stats.commit(save, t, lines[t], pts[loser if t == winner else winner])
+        _injury_roll(save, rng, t, news, mins[t])
         _tick_injuries(save, t)
-        _injury_roll(save, rng, t, news)
     return winner
 
 
@@ -140,11 +257,22 @@ def _start_season_if_needed(save: dict, rng: random.Random) -> None:
     save["sched_seed"] = rng.randrange(1 << 30)
     save["game_idx"] = 0
     save["standings"] = {a: [0, 0] for a in cba.TEAMS}
-    save["chem"] = {a: round(rng.gauss(0, 0.6), 2) for a in cba.TEAMS}
+    save["form"] = {a: round(rng.gauss(0, 0.4), 2) for a in cba.TEAMS}  # luck/health variance
+    if "chem" not in save:
+        chem.init(save)
     for p in save["players"].values():
         p["gp_missed"] = 0
+        carry = p.pop("out_carry", 0)
+        if carry and p.get("team"):
+            p["out"] = carry
+            p["inj"] = f"Still recovering ({carry} games)"
+    stats.start_season(save, rng)
+    draft.ensure_class(save, rng)
     ensure_rosters(save, rng)
     ai.refresh_modes(save)
+    save["preseason_ranks"] = dict(save["ranks"])
+    if save["phase"] == "preseason":
+        save["phase"] = "season"
 
 
 def sim_games(save: dict, rng: random.Random, until_idx: int) -> list[str]:
@@ -154,19 +282,21 @@ def sim_games(save: dict, rng: random.Random, until_idx: int) -> list[str]:
     while save["game_idx"] < min(until_idx, len(games)):
         home, away = games[save["game_idx"]]
         w = play_game(save, rng, home, away, news)
+        loser = away if w == home else home
         save["standings"][w][0] += 1
-        save["standings"][away if w == home else home][1] += 1
+        save["standings"][loser][1] += 1
+        coaches.record_game(save, w, loser)
         save["game_idx"] += 1
     for n in news[-6:]:
         L.add_log(save, n, news=True)
     return news
 
 
-def sim_to_deadline(save: dict, rng: random.Random) -> dict:
-    total = len(cba.TEAMS) * GAMES // 2
-    sim_games(save, rng, int(total * DEADLINE_SHARE))
+def _deadline_event(save: dict, rng: random.Random) -> dict:
     save["phase"] = "deadline"
-    trades = ai.ai_trades(save, rng, max_trades=rng.randint(3, 6))
+    save["deadline_done"] = True
+    # Real deadlines see roughly 15-25 trades in the final week (21 in 2025)
+    trades = ai.ai_trades(save, rng, max_trades=rng.randint(14, 22))
     inbox = []
     mine = [p for p in L.roster(save, save["team"]) if p["ovr"] >= 72 and not p.get("twoway")]
     rng.shuffle(mine)
@@ -179,6 +309,61 @@ def sim_to_deadline(save: dict, rng: random.Random) -> dict:
     save["inbox"] = inbox
     ai.refresh_modes(save)
     return {"trades": trades, "inbox": len(inbox)}
+
+
+def sim_chunk(save: dict, rng: random.Random, games: int | None = None, to: int | None = None) -> dict:
+    """Sim part of the regular season. Always stops at the trade deadline so you can make moves."""
+    _start_season_if_needed(save, rng)
+    start = save["game_idx"]
+    target = to if to is not None else start + (games or WEEK)
+    target = min(target, TOTAL_GAMES)
+    dl = deadline_idx()
+    if start < dl <= target:
+        target = dl
+    out = {"trades": [], "inbox": 0, "deadline": False, "games": 0, "news": []}
+    # in-season trades between AI teams happen now and then before the deadline
+    weeks = max(1, (target - start) // WEEK)
+    news = []
+    step = start
+    while step < target:
+        style.refresh(save)
+        nxt = min(target, step + WEEK)
+        news += sim_games(save, rng, nxt)
+        news += chem.weekly(save, rng, max(1, round((nxt - step) / WEEK)))
+        # Newly signed players can't be traded until Dec 15, so in-season deals pick up from mid-December
+        if nxt < dl and save.get("game_idx", 0) >= DEC15 and rng.random() < 0.55:
+            out["trades"] += ai.ai_trades(save, rng, max_trades=rng.randint(1, 2))
+        step = nxt
+    out["games"] = save["game_idx"] - start
+    out["news"] = news
+    if save["game_idx"] >= dl and not save.get("deadline_done"):
+        ev = _deadline_event(save, rng)
+        out["trades"] += ev["trades"]
+        out["inbox"] = ev["inbox"]
+        out["deadline"] = True
+    elif save["game_idx"] > dl:
+        save["phase"] = "stretch"
+    if save["game_idx"] >= TOTAL_GAMES:
+        save["phase"] = "stretch"
+        if not save.get("awards"):
+            out["awards"] = _end_regular_season(save, rng)
+    del weeks
+    return out
+
+
+def _end_regular_season(save: dict, rng: random.Random) -> dict:
+    stats.finish_season(save)
+    save["awards"] = regular_awards(save, rng)
+    L.add_log(save, f"🏅 {cba.season_label(save['season'])} MVP: {save['awards']['MVP']}", news=True)
+    return save["awards"]
+
+
+def sim_to_deadline(save: dict, rng: random.Random) -> dict:
+    return sim_chunk(save, rng, to=deadline_idx())
+
+
+def season_over(save: dict) -> bool:
+    return (save.get("game_idx") or 0) >= TOTAL_GAMES
 
 
 # ------------------------------------------------------------------------------------------
@@ -195,6 +380,7 @@ def seeds(save: dict) -> dict[str, list[str]]:
 
 
 def series(save: dict, rng: random.Random, high: str, low: str, best_of: int = 7) -> tuple[str, str, str]:
+    style.refresh(save)
     need = best_of // 2 + 1
     wh = wl = 0
     homes = [high, high, low, low, high, low, high]
@@ -202,7 +388,7 @@ def series(save: dict, rng: random.Random, high: str, low: str, best_of: int = 7
     while wh < need and wl < need:
         home = homes[g] if best_of == 7 else high
         away = low if home == high else high
-        p = win_prob(team_rating(save, home), team_rating(save, away))
+        p = win_prob(team_rating(save, home) + style.matchup(save, home, away), team_rating(save, away))
         winner = home if rng.random() < p else away
         if winner == high:
             wh += 1
@@ -216,10 +402,10 @@ def series(save: dict, rng: random.Random, high: str, low: str, best_of: int = 7
 
 
 def sim_postseason(save: dict, rng: random.Random) -> dict:
-    total = len(cba.TEAMS) * GAMES // 2
-    if save.get("phase") == "preseason":
-        sim_to_deadline(save, rng)
-    sim_games(save, rng, total)
+    while not season_over(save):
+        sim_chunk(save, rng, to=TOTAL_GAMES)
+    if not save.get("awards"):
+        _end_regular_season(save, rng)
     sd = seeds(save)
     result: dict[str, str] = {}
     bracket_log: list[str] = []
@@ -258,7 +444,7 @@ def sim_postseason(save: dict, rng: random.Random) -> dict:
     result[runner] = "Lost in NBA Finals"
     result[champ] = "🏆 NBA Champions"
     bracket_log.append(f"**NBA Finals:** {cba.TEAMS[champ].full} def. {cba.TEAMS[runner].full} ({score})")
-    awards = pick_awards(save, rng, champ)
+    awards = {**save.get("awards", {}), "Finals MVP": finals_mvp(save, rng, champ)}
     me = save["team"]
     w, l = st[me]
     seed_txt = next((f"{conf} #{order.index(me) + 1}" for conf, order in sd.items() if me in order), "")
@@ -267,35 +453,87 @@ def sim_postseason(save: dict, rng: random.Random) -> dict:
     save["history"].append(entry)
     if champ == me:
         save["titles"] = save.get("titles", 0) + 1
+    coaches.end_of_season(save, champ)
+    c = coaches.coach(save, me)
+    entry["coach"] = c["name"] if c else ""
     save["playoffs"] = {"result": result, "log": bracket_log, "seeds": sd}
     save["phase"] = "postseason"
     save["live"] = False
     save.pop("inbox", None)
+    for abbr in cba.TEAMS:  # remember each player's role (minutes) for development
+        for pid, m in L.minutes(save, abbr, healthy_only=False).items():
+            save["players"][pid]["role_min"] = m
     for p in save["players"].values():
+        if p.get("out", 0) > 25:   # long injuries carry into next season
+            p["out_carry"] = min(60, p["out"] - 25)
         p["out"] = 0
-        p["inj"] = None
+        p["inj"] = None if not p.get("out_carry") else f"Rehabbing ({p['out_carry']} games into next season)"
     L.add_log(save, f"🏆 {cba.TEAMS[champ].full} win the {cba.season_label(save['season'])} title", news=True)
     return entry
 
 
-def pick_awards(save: dict, rng: random.Random, champ: str) -> dict[str, str]:
+def _ln(p: dict) -> dict:
+    return p.get("season_line") or stats.line(p) or {}
+
+
+def _prod(p: dict) -> float:
+    x = _ln(p)
+    return x.get("pts", 0) + 0.8 * x.get("reb", 0) + 1.1 * x.get("ast", 0) + 1.5 * (x.get("stl", 0) + x.get("blk", 0))
+
+
+def _fmt(p: dict) -> str:
+    x = _ln(p)
+    s = f" · {x['pts']} PTS / {x['reb']} REB / {x['ast']} AST" if x else ""
+    return f"{p['name']} ({p['team']}){s}"
+
+
+def regular_awards(save: dict, rng: random.Random) -> dict[str, str]:
+    """End-of-regular-season awards (the 65-game rule applies to MVP, DPOY and All-NBA)."""
     st = save["standings"]
-    rostered = [p for p in save["players"].values() if p.get("team")]
-    eligible = [p for p in rostered if p.get("gp_missed", 0) <= 17]
+    rostered = [p for p in save["players"].values() if p.get("team") and _ln(p).get("gp", 0) > 0]
+    eligible = [p for p in rostered if _ln(p).get("gp", 0) >= 65] or rostered
 
     def wp(p):
         w, l = st.get(p["team"], [41, 41])
         return w / max(1, w + l)
-    mvp = max(eligible or rostered, key=lambda p: p["ovr"] * 1.0 + wp(p) * 14 + rng.gauss(0, 1.2))
-    dpoy = max(eligible or rostered, key=lambda p: p["attrs"]["def"] * 0.7 + p["ovr"] * 0.3 + rng.gauss(0, 2))
-    rookies = [p for p in rostered if p.get("exp", 0) == 0]
-    roy = max(rookies, key=lambda p: p["ovr"] + rng.gauss(0, 1)) if rookies else None
-    fmvp = max(L.roster(save, champ)[:3], key=lambda p: p["ovr"] + rng.gauss(0, 1.5))
-    fmt = lambda p: f"{p['name']} ({p['team']})"
-    out = {"MVP": fmt(mvp), "DPOY": fmt(dpoy), "Finals MVP": fmt(fmvp)}
+    mvp_score = {p["id"]: p["ovr"] * 0.8 + _prod(p) * 0.25 + wp(p) * 14 + rng.gauss(0, 1.0) for p in eligible}
+    ranked = sorted(eligible, key=lambda p: -mvp_score[p["id"]])
+    dpoy = max(eligible, key=lambda p: p.get("attrs", {}).get("def", 50) * 0.5 + p["ovr"] * 0.2
+               + 6 * (_ln(p).get("stl", 0) + _ln(p).get("blk", 0)) + rng.gauss(0, 2))
+    rookies = [p for p in rostered if p.get("exp", 0) == 0 and _ln(p).get("gp", 0) >= 40]
+    roy = max(rookies, key=lambda p: _prod(p) + p["ovr"] * 0.3 + rng.gauss(0, 1)) if rookies else None
+    bench = []
+    for abbr in cba.TEAMS:
+        five = {q["id"] for q in L.starters(save, abbr)}
+        bench += [p for p in L.roster(save, abbr) if p["id"] not in five and _ln(p).get("gp", 0) >= 50]
+    smoy = max(bench, key=lambda p: _prod(p) + rng.gauss(0, 1)) if bench else None
+
+    def improved(p):
+        prev = (p.get("hist") or {}).get(str(save["season"] - 1)) or {}
+        if not prev or prev.get("gp", 0) < 25:
+            return -99
+        before = prev.get("pts", 0) + 0.8 * prev.get("reb", 0) + 1.1 * prev.get("ast", 0)
+        return _prod(p) - before + rng.gauss(0, 0.8)
+    mip = max(rostered, key=improved) if rostered else None
+    exp = save.get("preseason_ranks") or {}
+    coy_team = max(cba.TEAMS, key=lambda a: st[a][0] - (61 - (exp.get(a, 15) - 1) * 1.4))
+    c = coaches.coach(save, coy_team)
+    out = {"MVP": _fmt(ranked[0]), "DPOY": _fmt(dpoy)}
     if roy:
-        out["ROY"] = fmt(roy)
+        out["ROY"] = _fmt(roy)
+    if smoy:
+        out["6MOY"] = _fmt(smoy)
+    if mip and improved(mip) > 0:
+        out["MIP"] = _fmt(mip)
+    if c:
+        out["COY"] = f"{c['name']} ({coy_team}, {st[coy_team][0]}-{st[coy_team][1]})"
+    out["All-NBA 1st Team"] = ", ".join(f"{p['name']} ({p['team']})" for p in ranked[:5])
     return out
+
+
+def finals_mvp(save: dict, rng: random.Random, champ: str) -> str:
+    p = max(L.roster(save, champ)[:4], key=lambda p: p["ovr"] + _prod(p) * 0.2 + rng.gauss(0, 1.5))
+    return _fmt(p)
 
 
 # ------------------------------------------------------------------------------------------
@@ -326,7 +564,7 @@ def make_player(rng: random.Random, season: int, ovr: int, age: int, pot: int | 
         attrs[k] = int(max(25, min(99, base)))
     return {"id": pid, "name": name or f"{rng.choice(FIRST)} {rng.choice(LAST)}", "team": None, "pos": pos,
             "age": age, "exp": 0, "salary": [], "ovr": ovr, "pot": pot, "attrs": attrs, "line": {}, "hist": {},
-            "inj": None, "jersey": "", "headshot": "", "generated": True}
+            "inj": None, "jersey": "", "headshot": "", "generated": True, "dur": round(rng.uniform(0.68, 0.96), 3)}
 
 
 def _top_mean(save: dict, n: int = 150) -> float:
@@ -339,27 +577,39 @@ def progress_players(save: dict, rng: random.Random) -> list[str]:
     retired = []
     for p in list(save["players"].values()):
         a, ovr, pot = p["age"], p["ovr"], p.get("pot", p["ovr"])
-        if a <= 21:
-            d = (pot - ovr) * 0.22 + rng.gauss(0, 2.4)
-        elif a <= 24:
-            d = (pot - ovr) * 0.18 + rng.gauss(0, 2.1)
-        elif a <= 27:
-            d = rng.gauss(0.2, 1.8)
-        elif a <= 30:
-            d = rng.gauss(-0.9, 1.8)
+        dev = coaches.dev_bonus(save, p.get("team")) if a <= 25 else 0.0
+        if a <= 21:                                  # big jumps for teenagers
+            d = (pot - ovr) * 0.24 + rng.gauss(0, 2.4)
+        elif a <= 23:
+            d = (pot - ovr) * 0.18 + rng.gauss(0, 2.0)
+        elif a <= 25:                                # growth slows as he nears his peak
+            d = (pot - ovr) * 0.10 + rng.gauss(0.2, 1.7)
+        elif a <= 28:                                # prime: small ups and downs
+            d = (pot - ovr) * 0.05 + rng.gauss(0.1, 1.4)
+        elif a <= 30:                                # still prime, very slow fade
+            d = rng.gauss(-0.3, 1.3)
         elif a <= 32:
-            d = rng.gauss(-2.2, 2.0)
-        elif a <= 34:
-            d = rng.gauss(-3.5, 2.2)
+            d = rng.gauss(-0.9, 1.3)
+        elif a <= 33:
+            d = rng.gauss(-1.7, 1.4)
+        elif a <= 35:                                # real decline every year from here
+            d = min(-1.0, rng.gauss(-3.0, 1.6))
+        elif a <= 37:
+            d = min(-1.5, rng.gauss(-4.0, 1.8))
         else:
-            d = rng.gauss(-5.0, 2.5)
+            d = min(-2.0, rng.gauss(-5.0, 2.0))
+        if a >= 33 and p["ovr"] >= 84 and noise(p["id"] + "ageless", 1) > 0.9:
+            d = d * 0.45                              # the rare LeBron-type who ages slowly
+        d += dev
+        if a <= 24 and p.get("team"):
+            d += max(-0.8, min(0.8, (p.get("role_min", 18) - 18) / 15))  # young guys grow with minutes
         if d > 0:
             d *= max(0.25, (99 - ovr) / 14) if ovr >= 85 else 1.0
         d = round(d)
         p["ovr"] = int(max(40, min(99, ovr + d)))
         p["age"] = a + 1
         p["exp"] = p.get("exp", 0) + 1
-        if p["age"] <= 26:
+        if p["age"] <= 28:
             p["pot"] = int(max(p["ovr"], min(99, pot + rng.gauss(0, 1.5))))
         else:
             p["pot"] = p["ovr"]
@@ -417,6 +667,7 @@ def lottery(save: dict, rng: random.Random) -> list[str]:
 def start_offseason(save: dict, rng: random.Random) -> dict:
     """After the Finals: aging/progression, contracts roll over, lottery, draft class."""
     notes = progress_players(save, rng)
+    notes += [n for n in coaches.carousel(save, rng)]
     for p in save["players"].values():
         if p.get("salary"):
             p["salary"] = p["salary"][1:]
@@ -434,28 +685,11 @@ def start_offseason(save: dict, rng: random.Random) -> dict:
                 owner = orig
                 L.add_log(save, f"🛡️ {orig}'s pick landed #{slot} and stayed with {orig} (top-{k['prot']} protected).", news=True)
             picks.append({"no": slot + (30 if rnd == 2 else 0), "orig": orig, "owner": owner})
-    save["draft"] = {"order": order, "picks": picks, "idx": 0, "prospects": make_class(rng, year), "log": []}
+    prospects = [dict(p) for p in draft.ensure_class(save, rng)]
+    save["draft"] = {"order": order, "picks": picks, "idx": 0, "prospects": prospects, "log": []}
     save["phase"] = "draft"
     lot_top = ", ".join(f"#{i + 1} {a}" for i, a in enumerate(order[:4]))
     return {"notes": notes, "lottery": lot_top}
-
-
-def make_class(rng: random.Random, year: int) -> list[dict]:
-    strength = rng.gauss(0, 1.5)
-    out = []
-    for i in range(72):
-        tier = i / 72
-        age = rng.choice([19, 19, 19, 20, 20, 21, 22])
-        pot = int(max(55, min(97, 90 - tier * 32 + rng.gauss(strength, 3.5) - (age - 19) * 1.5)))
-        ovr = int(max(40, min(78, pot - rng.randint(10, 22) + (age - 19) * 2)))
-        p = make_player(rng, year, ovr=ovr, age=age, pot=pot)
-        p["draft_year"] = year
-        p["scout"] = pot + rng.randint(-4, 4)  # what scouts think his ceiling is
-        out.append(p)
-    out.sort(key=lambda p: -(p["scout"] * 0.7 + p["ovr"] * 0.3))
-    for i, p in enumerate(out, 1):
-        p["big_board"] = i
-    return out
 
 
 def on_the_clock(save: dict) -> dict | None:
@@ -480,7 +714,8 @@ def make_pick(save: dict, prospect_id: str) -> str:
     d["prospects"].remove(p)
     p["salary"] = rookie_salary(slot["no"], save["season"] + 1)
     p["drafted"] = f"{save['season']} #{slot['no']}"
-    p.pop("scout", None)
+    for k in ("scout", "ceil", "floor", "rank", "big_board"):
+        p.pop(k, None)
     save["players"][p["id"]] = p
     p["team"] = None
     L.move_player(save, p["id"], slot["owner"])
@@ -519,7 +754,8 @@ def finish_draft(save: dict) -> None:
         return
     d = save["draft"]
     for p in d["prospects"][:20]:  # best undrafted guys hit free agency
-        p.pop("scout", None)
+        for k in ("scout", "ceil", "floor", "rank", "big_board"):
+            p.pop(k, None)
         save["players"][p["id"]] = p
         save["fa"].append(p["id"])
     d["prospects"] = []
@@ -592,73 +828,31 @@ def ai_resign(save: dict, rng: random.Random) -> None:
 
 
 def start_free_agency(save: dict, rng: random.Random) -> None:
-    for pid in list(save.get("asks", {})):
-        let_walk(save, pid)
-    for p in L.roster(save, save["team"]):
+    me = save["team"]
+    for pid, a in list(save.get("asks", {}).items()):
+        p = save["players"].get(pid)
+        if p:
+            if a.get("refuses"):
+                p["refuses"] = me
+            let_walk(save, pid)
+            p["bird_team"] = me          # you keep his Bird rights in free agency
+    for p in L.roster(save, me):
         if p.get("expiring"):
             let_walk(save, p["id"])
+            p["bird_team"] = me
     ai_resign(save, rng)
-    save["fa"] = [pid for pid in save["fa"] if pid in save["players"]]
+    for t in ai.ai_trades(save, rng, max_trades=rng.randint(6, 12)):  # draft-night and summer deals
+        L.add_log(save, f"🔁 Offseason trade: {t}", news=True)
+    save["fa"] = [pid for pid in dict.fromkeys(save["fa"]) if pid in save["players"]]
     for pid in save["fa"]:
         p = save["players"][pid]
         p["salary"] = []
-        p.pop("est", None)
         p.pop("twoway", None)
-    save["fa_asks"] = {pid: asking(save, save["players"][pid]) for pid in save["fa"]}
     save["phase"] = "fa"
-    save["used_mle"] = False
+    save["fa_day"] = 0
+    save["pending"] = {}
+    save["used_mle"] = {}
     ai.refresh_modes(save)
-
-
-def fa_options(save: dict, pid: str) -> tuple[bool, str, int]:
-    """Can the user sign this free agent at his asking price? (ok, how/why, amount)"""
-    p = save["players"][pid]
-    ask = save["fa_asks"][pid]
-    season = save["season"] + 1
-    cap = cba.cap_sheet(season)
-    pay = L.payroll(save, save["team"])
-    amt = ask["amount"]
-    w, l = L.record(save, save["team"])
-    appeal = 1.0 if w >= 47 else 1.08 if w >= 38 else 1.18
-    if p["age"] <= 25:
-        appeal = 1.0
-    need = int(round(amt * appeal, -4))
-    min_sal = int(cba.MIN_SALARY * (1 + cba.CAP_GROWTH) ** max(0, season - cba.FIRST_SEASON))
-    if L.standard_count(save, save["team"]) >= cba.ROSTER_MAX_OFFSEASON:
-        return False, "Your roster is full (18). Trade or release someone first.", need
-    if pay + need <= cap["cap"]:
-        return True, "using cap space", need
-    if need <= min_sal * 1.05:
-        return True, "on a minimum contract", min_sal
-    if not save.get("used_mle"):
-        if pay + need <= cap["apron1"] and need <= cap["mle"]:
-            return True, "with the non-taxpayer mid-level exception", need
-        if pay + need <= cap["apron2"] and need <= cap["tp_mle"]:
-            return True, "with the taxpayer mid-level exception", need
-    space = max(0, cap["cap"] - pay)
-    return False, (f"He wants {cba.money(need)}{' (more to join a losing team)' if appeal > 1 else ''}. "
-                   f"You have {cba.money(space)} in cap space"
-                   + ("" if save.get("used_mle") else f" and your mid-level tops out at {cba.money(cap['mle'] if pay + need <= cap['apron1'] else cap['tp_mle'])}")
-                   + "."), need
-
-
-def sign_fa(save: dict, pid: str) -> str:
-    ok, how, amt = fa_options(save, pid)
-    if not ok:
-        return how
-    p = save["players"][pid]
-    yrs = save["fa_asks"][pid]["years"]
-    if "mid-level" in how:
-        save["used_mle"] = True
-        yrs = min(yrs, 4 if "non-taxpayer" in how else 2)
-    if "minimum" in how:
-        yrs = min(yrs, 2)
-    p["salary"] = [int(amt * (1.05 ** i)) for i in range(yrs)]
-    p.pop("est", None)
-    save["fa_asks"].pop(pid, None)
-    L.move_player(save, pid, save["team"])
-    p["acq"] = save["season"] + 1
-    return f"✍️ Signed {p['name']} {how}: {yrs} yrs, {cba.money(sum(p['salary']))} total"
 
 
 def ai_free_agency(save: dict, rng: random.Random) -> list[str]:
@@ -721,11 +915,17 @@ def new_season(save: dict, rng: random.Random) -> dict:
     save["fa"] = [pid for pid in save["fa"] if save["players"][pid]["ovr"] >= 50 and save["players"][pid]["age"] <= 36][:150]
     keep = set(save["fa"]) | {pid for ids in save["rosters"].values() for pid in ids}
     save["players"] = {k: v for k, v in save["players"].items() if k in keep}
-    for k in ("game_idx", "draft", "playoffs", "asks", "fa_asks", "inbox"):
+    for k in ("game_idx", "draft", "draft_class", "playoffs", "asks", "fa_asks", "inbox", "deadline_done", "pending", "fa_day",
+              "inj_log", "awards"):
         save.pop(k, None)
+    for p in save["players"].values():
+        p.pop("bird_team", None)
+        p.pop("refuses", None)
     save["standings"] = {}
     save["phase"] = "preseason"
-    save["used_mle"] = False
+    save["used_mle"] = {}
     ensure_rosters(save, rng)
+    champ = save["history"][-1]["champion"] if save.get("history") else None
+    chem.season_rollover(save, champ)
     ai.refresh_modes(save)
     return {"signings": news, "cut": cut}

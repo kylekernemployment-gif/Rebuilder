@@ -133,6 +133,21 @@ def attributes(players: dict[str, dict], season: int) -> None:
             p["attrs"][k] = int(max(25, min(99, round(val + noise(pid + k, 2)))))
 
 
+def durability(p: dict, season: int) -> float:
+    """0-1: share of games he's been available for in recent seasons (shrunk toward average).
+    Iron men like Mikal Bridges land near 1.0; injury-prone stars land well below."""
+    games = avail = 0.0
+    for yr, s in (p.get("hist") or {}).items():
+        if int(yr) >= season or s.get("mpg", 0) < 18:
+            continue  # current season is too small a sample; bench guys' DNPs aren't injuries
+        games += min(82.0, s.get("gp", 0))
+        avail += 82.0
+    if avail == 0:
+        return 0.85
+    raw = games / avail
+    return round((raw * avail + 0.82 * 40) / (avail + 40), 3)
+
+
 def rate_league(players: dict[str, dict], season: int) -> None:
     prod = {pid: production(p, season) for pid, p in players.items()}
     for rank, pid in enumerate(sorted(prod, key=prod.get, reverse=True), start=1):
@@ -140,6 +155,7 @@ def rate_league(players: dict[str, dict], season: int) -> None:
         ovr = ovr_from_rank(rank) + noise(pid, 0.6)
         p["ovr"] = int(round(max(40, min(99, ovr))))
         p["pot"] = potential(p["ovr"], p.get("age", 25), pid)
+        p["dur"] = durability(p, season)
         s, _ = weighted_stats(p, season)
         p["line"] = {k: round(s.get(k, 0.0), 1) for k in ("gp", "mpg", "pts", "reb", "ast", "stl", "blk")}
         if s.get("fga"):
