@@ -1,0 +1,28 @@
+{
+  "_note": "Future first-round picks that have already changed hands (best-known as of October 2026, simplified: swaps are left out and 'prot' means the pick stays with the original team if it lands in the top N). Every pick not listed here belongs to its original team. Edit this file to correct or add picks; the bot reads it when a new save starts.",
+  "traded_firsts": [
+    {"year": 2027, "orig": "NYK", "owner": "BKN", "prot": 0},
+    {"year": 2029, "orig": "NYK", "owner": "BKN", "prot": 0},
+    {"year": 2031, "orig": "NYK", "owner": "BKN", "prot": 0},
+    {"year": 2027, "orig": "LAL", "owner": "MEM", "prot": 4},
+    {"year": 2029, "orig": "LAL", "owner": "DAL", "prot": 0},
+    {"year": 2031, "orig": "LAL", "owner": "UTA", "prot": 0},
+    {"year": 2033, "orig": "LAL", "owner": "UTA", "prot": 0},
+    {"year": 2031, "orig": "MIN", "owner": "SAC", "prot": 0},
+    {"year": 2033, "orig": "MIN", "owner": "CHA", "prot": 0},
+    {"year": 2027, "orig": "MIA", "owner": "CHA", "prot": 14},
+    {"year": 2031, "orig": "MIA", "owner": "MIL", "prot": 0},
+    {"year": 2033, "orig": "MIA", "owner": "MIL", "prot": 0},
+    {"year": 2031, "orig": "PHI", "owner": "BOS", "prot": 0},
+    {"year": 2031, "orig": "CLE", "owner": "DEN", "prot": 0},
+    {"year": 2032, "orig": "DEN", "owner": "BKN", "prot": 0},
+    {"year": 2028, "orig": "ORL", "owner": "POR", "prot": 0},
+    {"year": 2030, "orig": "ORL", "owner": "MEM", "prot": 0},
+    {"year": 2027, "orig": "PHX", "owner": "HOU", "prot": 0},
+    {"year": 2027, "orig": "DAL", "owner": "CHA", "prot": 2},
+    {"year": 2027, "orig": "ATL", "owner": "SAS", "prot": 0},
+    {"year": 2029, "orig": "HOU", "owner": "BKN", "prot": 0},
+    {"year": 2030, "orig": "GSW", "owner": "MEM", "prot": 20},
+    {"year": 2027, "orig": "MIL", "owner": "NOP", "prot": 4}
+  ]
+}
