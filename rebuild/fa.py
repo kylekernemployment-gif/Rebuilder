@@ -83,7 +83,7 @@ def legal_route(save: dict, team: str, p: dict, amount: int, years: int) -> tupl
     pay = L.payroll(save, team)
     mins = min_salary(save)
     if L.standard_count(save, team) >= roster_limit(save):
-        return False, f"Your roster is full ({roster_limit(save)}). Release or trade someone first (`/rebuild release`)."
+        return False, f"Your roster is full ({roster_limit(save)}). Release or trade someone first (**More → Release a player**)."
     if amount > cba.max_salary(yr, p.get("exp", 0)):
         return False, f"That's above the max for his experience ({cba.money(cba.max_salary(yr, p.get('exp', 0)))})."
     if not 1 <= years <= 5:
@@ -146,6 +146,8 @@ def _sign(save: dict, pid: str, team: str, amount: int, years: int, route: str) 
     p.pop("bird_team", None)
     L.move_player(save, pid, team)
     p["acq"] = save["season"] + (1 if save["phase"] in OFFSEASON else 0)
+    # newly signed free agents can't be traded until Dec 15 (or 3 months after an in-season deal)
+    p["signed"] = [p["acq"], None if save["phase"] in OFFSEASON else (save.get("game_idx") or 0)]
     _mark_mle(save, team, route)
     (save.get("pending") or {}).pop(pid, None)
     from .chem import reset_after_move
@@ -158,6 +160,8 @@ def offer(save: dict, pid: str, amount: int, years: int) -> dict:
     me = save["team"]
     if not p or p.get("team"):
         return {"kind": "gone", "msg": "He's already signed somewhere."}
+    if save["phase"] in ("postseason", "draft"):
+        return {"kind": "closed", "msg": "Free agency opens after the draft and the re-signing period."}
     if p.get("refuses") == me:
         return {"kind": "no", "msg": f"{p['name']} has made it clear he won't come back."}
     ok, route = legal_route(save, me, p, amount, years)

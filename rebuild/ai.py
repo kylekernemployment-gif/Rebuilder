@@ -192,6 +192,24 @@ def reluctance(save: dict, abbr: str, p: dict) -> float:
 
 
 UNTOUCHABLE = 0.7
+SIGNED_LOCK_GAMES = 636       # about 90 days of league games
+
+
+def unlock_idx(save: dict, p: dict) -> int | None:
+    """Game index at which a player signed as a free agent becomes tradable (Dec 15, or three
+    months after an in-season signing), or None if he can be traded now."""
+    from .sim import DEC15
+    signed = p.get("signed")
+    if not signed:
+        return None
+    season, idx = signed
+    if season < save["season"] or (season == save["season"] and save["phase"] not in
+                                    ("preseason", "season", "deadline", "stretch")):
+        return None
+    at = DEC15 if idx is None else max(DEC15, idx + SIGNED_LOCK_GAMES)
+    if season > save["season"] or (save.get("game_idx") or 0) < at:
+        return at
+    return None
 APRON_TOLERANCE = 1_000_000   # house rule: above the first apron, incoming salary may exceed outgoing by $1M
 
 
@@ -246,7 +264,7 @@ def validate(save: dict, t: Trade) -> list[str]:
     if save.get("phase") == "stretch":
         return ["The trade deadline has passed. Trades reopen after the playoffs."]
     if save.get("phase") == "draft":
-        return ["Trades are paused during the draft. Finish it with /rebuild sim."]
+        return ["Trades are paused during the draft. Finish it from Home."]
     if not t.a_out and not t.b_out:
         return ["Add something to the trade first."]
     if not t.a_out or not t.b_out:
@@ -260,6 +278,12 @@ def validate(save: dict, t: Trade) -> list[str]:
         for pid in out_p:
             if save["players"].get(pid, {}).get("team") != team:
                 problems.append(f"{name} no longer have that player.")
+                continue
+            at = unlock_idx(save, save["players"][pid])
+            if at is not None:
+                from .sim import date_at
+                problems.append(f"{save['players'][pid]['name']} just signed as a free agent and can't be traded "
+                                f"until {date_at(save, at)}.")
         for kid in out_k:
             if save["picks"].get(kid, {}).get("owner") != team:
                 problems.append(f"{name} don't own that pick.")

@@ -134,3 +134,89 @@ def test_2k_parser_ignores_older_games():
         '<h2>NBA 2K26</h2><a href="x">Jalen Duren</a><span class="attribute-box">80</span>'
     got = sources.parse_2k_ratings(page, {"jalen duren"})
     assert got == {"jalen duren": 85}
+
+
+def test_payrolls_decide_rosters_and_retired_players_are_gone():
+    """ESPN can lag: DeRozan still listed on the Kings with his old deal, and Westbrook (retired)
+    in last season's stats. The payroll snapshot puts DeRozan on Denver, an unsigned vet ESPN still
+    lists on a team goes to free agency, and retired players never show up as free agents."""
+    from rebuild.data import build_league, parse_roster, refresh_snapshot
+    roster = {"athletes": [
+        {"id": "10", "displayName": "DeMar DeRozan", "age": 37, "position": {"abbreviation": "SF"},
+         "contract": {"salary": 25_000_000, "yearsRemaining": 1}},
+        {"id": "11", "displayName": "Stale Veteran", "age": 34, "position": {"abbreviation": "SG"},
+         "contract": {"salary": 9_000_000, "yearsRemaining": 1}}]}
+    rosters = {a: [] for a in cba.TEAMS}
+    rosters["SAC"] = parse_roster(roster, "SAC", 2027)
+    stats = {2026: {"10": {"gp": 77, "mpg": 33, "pts": 19}, "11": {"gp": 60, "mpg": 20, "pts": 8},
+                    "12": {"gp": 70, "mpg": 25, "pts": 13}, "13": {"gp": 50, "mpg": 18, "pts": 7}}}
+    meta = {"12": {"name": "Russell Westbrook", "age": 37, "pos": "PG"},
+            "13": {"name": "Free Agent Guy", "age": 30, "pos": "SF"}}
+    lg = build_league(rosters, stats, 2027, meta=meta)
+    assert lg["players"]["10"]["team"] == "DEN" and "10" in lg["teams"]["DEN"]
+    assert lg["players"]["11"]["team"] is None and "11" in lg["fa"]
+    assert "12" not in lg["players"] and "13" in lg["fa"]
+    assert not any(p["name"] in ("Russell Westbrook", "Nicolas Batum") for p in lg["players"].values())
+    # a cached league built before a fix still gets it on the next boot
+    old = {**lg, "players": {**lg["players"], "12": {**lg["players"]["13"], "id": "12", "name": "Russell Westbrook"}}}
+    again = refresh_snapshot(old)
+    assert "12" not in again["players"] and again["players"]["10"]["team"] == "DEN"
+
+
+def test_new_free_agents_cant_be_flipped_right_away():
+    s = save_for()
+    s["phase"] = "fa"
+    s["fa_day"] = 0
+    p = s["players"][L.roster(s, "PHX", include_twoway=False)[-1]["id"]]
+    L.waive(s, p["id"])
+    p["bird_team"] = "NYK"          # Bird rights: always a legal route
+    fa._sign(s, p["id"], "NYK", fa.min_salary(s), 2, "Bird rights")
+    them = L.roster(s, "BKN", include_twoway=False)[-1]
+    t = ai.Trade("NYK", "BKN", [f"p:{p['id']}"], [f"p:{them['id']}"])
+    assert any("can't be traded until Dec" in x for x in ai.validate(s, t))
+    # next season, from Dec 15 on, he's fair game
+    s["season"] += 1
+    s["phase"] = "season"
+    s["game_idx"] = sim.DEC15 - 1
+    assert any("just signed" in x for x in ai.validate(s, t))
+    s["game_idx"] = sim.DEC15
+    assert not any("just signed" in x for x in ai.validate(s, t))
+    # in-season signings wait three months
+    p["signed"] = [s["season"], sim.DEC15]
+    assert any("just signed" in x for x in ai.validate(s, t))
+
+
+def test_stale_buttons_never_replay_a_season_step(tmp_path):
+    import asyncio
+    import types
+    from test_discord import FakeInteraction, choose, click, find
+    from rebuild.cog import Rebuild
+
+    c = Rebuild(types.SimpleNamespace(), None, str(tmp_path / "t.db"))
+    c.live = fake_espn()
+    c.feed.set_players(c.live["players"])
+
+    async def flow():
+        await c.store.init()
+        i = FakeInteraction()
+        await Rebuild.rebuild_cmd.callback(c, i)
+        hub = i.sent[-1][3]
+        await choose(hub, "Run the (East)", "NYK")
+        i2 = FakeInteraction()
+        await Rebuild.rebuild_cmd.callback(c, i2)          # a second, older /rebuild message
+        stale_week = find(i2.sent[-1][3], "button", "Sim 1 week")
+        save = await c.get_save(1)
+        await click(hub, "Sim to trade deadline")
+        await click(hub, "Sim to end of season")
+        stale_playoffs = find(hub, "button", "Play the playoffs")
+        await click(hub, "Play the playoffs")
+        x = FakeInteraction(component=True)
+        await stale_playoffs.callback(x)                   # double-click
+        assert len(save["history"]) == 1 and "out of date" in x.last_embed().fields[-1].value
+        await click(hub, "Start offseason")
+        ages = {pid: p["age"] for pid, p in save["players"].items()}
+        await stale_week.callback(FakeInteraction(component=True))
+        assert save["phase"] in ("draft", "resign")
+        assert all(save["players"][pid]["age"] == a for pid, a in ages.items() if pid in save["players"])
+
+    asyncio.run(flow())

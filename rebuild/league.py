@@ -101,7 +101,7 @@ def trim_camp_rosters(save: dict) -> None:
     """Preseason ESPN rosters include camp invites; keep 15 standard deals + up to 3 two-ways."""
     for abbr, ids in save["rosters"].items():
         ps = [save["players"][i] for i in ids]
-        standard = sorted([p for p in ps if not p.get("twoway")], key=lambda p: -p["salary"][0])
+        standard = sorted([p for p in ps if not p.get("twoway")], key=lambda p: -salary_now(p))
         twoway = sorted([p for p in ps if p.get("twoway")], key=lambda p: -p["ovr"])
         keep = standard[:cba.ROSTER_MAX] + twoway[:3]
         for p in standard[cba.ROSTER_MAX:] + twoway[3:]:

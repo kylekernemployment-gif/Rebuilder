@@ -211,3 +211,22 @@ def test_saves_survive_restart(cog, tmp_path):
         assert rows and rows[0][1] == "SAS"
 
     run(flow())
+
+
+def test_switching_teams_asks_first(cog):
+    async def flow():
+        i = FakeInteraction()
+        await Rebuild.rebuild_cmd.callback(cog, i)
+        hub = i.sent[-1][3]
+        await choose(hub, "Run the (East)", "NYK")
+        await menu(hub, "newteam")
+        x = await choose(hub, "Run the (West)", "LAL")
+        assert "Start over" in x.last_embed().title
+        await click(hub, "Keep my current save")
+        assert (await cog.get_save(1))["team"] == "NYK"
+        await menu(hub, "newteam")
+        await choose(hub, "Run the (West)", "LAL")
+        await click(hub, "Yes, take over")
+        assert (await cog.get_save(1))["team"] == "LAL"
+
+    run(flow())

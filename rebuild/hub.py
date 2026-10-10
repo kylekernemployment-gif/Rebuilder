@@ -291,6 +291,11 @@ class HubView(OwnerView):
         if key == "home":
             page = SimView(cog, uid, save)
             embed = home_embed(save)
+            fresh = (cog.live or {}).get("fetched", 0)
+            if save.get("live") and save.get("game_idx") is None and fresh - save.get("data_as_of", fresh) > 12 * 3600:
+                embed.add_field(name="🆕 Newer real rosters", value=(
+                    "Signings, trades and retirements have happened since this save was created. To play with "
+                    "today's rosters, use **More → Switch teams** and pick your team again."), inline=False)
             nb = discord.ui.Button(label="Start over with a new team", emoji="🔄", style=discord.ButtonStyle.danger, row=2)
             nb.callback = self._go("newteam")
             page.add_item(nb)
@@ -334,7 +339,7 @@ class HubView(OwnerView):
                 page.build(save)
                 embed = E.trade_embed(save, t)
         elif key == "fa":
-            if save["phase"] in ("draft", "resign"):
+            if save["phase"] in ("postseason", "draft", "resign"):
                 embed = home_embed(save)
                 embed.add_field(name="Free agency", value="Opens after the draft and re-signing period (Home).", inline=False)
             else:
@@ -438,7 +443,10 @@ class HubView(OwnerView):
                 page = Page(cog, uid)
 
                 async def pick(inter, team):
-                    await self.start_team(inter, team)
+                    s2 = await cog.get_save(uid)
+                    if s2 is None:
+                        return await self.start_team(inter, team)
+                    await self.confirm_new_team(inter, s2, team)
                 team_selects(page, pick, placeholder="Run the")
         else:
             embed = home_embed(save)
@@ -494,6 +502,29 @@ class HubView(OwnerView):
                           f"**{len(dicts)} team{'s' if len(dicts) != 1 else ''}** made a real offer, best first.")
         self.adopt(page)
         await self.respond(interaction, page.embed(save))
+
+    async def confirm_new_team(self, interaction: discord.Interaction, save: dict, abbr: str) -> None:
+        """Replacing a save can't be undone, so ask once before throwing seasons away."""
+        page = Page(self.cog, self.user_id)
+        yes = discord.ui.Button(label=f"Yes, take over the {cba.TEAMS[abbr].name}"[:80], emoji="🔄",
+                                style=discord.ButtonStyle.danger, row=0)
+        no = discord.ui.Button(label="Keep my current save", style=discord.ButtonStyle.secondary, row=0)
+
+        async def go(inter):
+            await self.start_team(inter, abbr)
+
+        async def back(inter):
+            await self.show(inter, "home")
+        yes.callback, no.callback = go, back
+        page.add_item(yes)
+        page.add_item(no)
+        seasons = len(save.get("history") or [])
+        done = f" after {seasons} season{'s' if seasons != 1 else ''}" if seasons else ""
+        e = discord.Embed(title=f"Start over with the {cba.TEAMS[abbr].full}?", color=E.color(abbr), description=(
+            f"This deletes your **{cba.TEAMS[save['team']].full}** save{done} "
+            f"(🏆×{save.get('titles', 0)}, {save.get('trades', 0)} trades). It can't be undone."))
+        self.adopt(page)
+        await self.respond(interaction, e)
 
     async def start_team(self, interaction: discord.Interaction, abbr: str) -> None:
         cog = self.cog

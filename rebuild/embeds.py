@@ -194,7 +194,7 @@ def offer_lines(save: dict, t: ai.Trade, me: str) -> tuple[str, str]:
 def standings_embed(save: dict) -> discord.Embed:
     e = discord.Embed(title=f"{cba.season_label(save['season'])} Standings", color=ACCENT)
     if not save.get("standings"):
-        e.description = "The season hasn't tipped off yet. Use `/rebuild sim` to start it.\n\n**Power rankings**\n" + "\n".join(
+        e.description = "The season hasn't tipped off yet. Start it from **Home**.\n\n**Power rankings**\n" + "\n".join(
             f"{r}. {'**' + a + '**' if a == save['team'] else a} {ai.MODES[ai.mode_of(save, a)].split(' ')[0]}"
             for a, r in sorted((save.get("ranks") or L.strength_ranks(save)).items(), key=lambda x: x[1]))
         return e
@@ -265,8 +265,9 @@ def welcome_embed(save: dict, live_rumors: list[str]) -> discord.Embed:
     if live_rumors:
         e.add_field(name="📡 Live intel on your roster", value="\n".join(live_rumors)[:1024], inline=False)
     e.add_field(name="Get started", value=(
-        "`/rebuild team` roster & cap sheet · `/rebuild trade` build a trade · `/rebuild shop` see offers for a player\n"
-        "`/rebuild market` who's available · `/rebuild rumors` live feed · `/rebuild sim` play the season"), inline=False)
+        "📋 **Roster** your roster & cap sheet · 🔁 **Trade** build a trade · 🏠 **Home** play the season\n"
+        "☰ **More** → Shop a player for offers · Trade market for who's available · Rumor feed for live news"),
+        inline=False)
     e.set_footer(text=footer(save))
     return e
 

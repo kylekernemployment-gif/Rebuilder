@@ -1,4 +1,30 @@
 {
- "_note": "Manual roster/contract fixes for anything the payroll data gets wrong. Applied last. Example: {\"name\": \"Player Name\", \"team\": \"LAL\", \"salary\": [10000000, 10500000]}",
- "players": []
+ "_note": "Manual roster fixes, applied after the payroll data. 'players': move a player and set his contract (team null = free agent), e.g. {\"name\": \"Player Name\", \"team\": \"LAL\", \"salary\": [10000000, 10500000]}. 'retired': players removed from the league entirely (no team, not in free agency).",
+ "players": [],
+ "retired": [
+  {
+   "name": "Russell Westbrook",
+   "when": "2026-08-12"
+  },
+  {
+   "name": "Chris Paul",
+   "when": "2026-02"
+  },
+  {
+   "name": "Kyle Lowry",
+   "when": "2026-07-07"
+  },
+  {
+   "name": "Garrett Temple",
+   "when": "2026-07-04"
+  },
+  {
+   "name": "Nicolas Batum",
+   "when": "2026-09-21"
+  },
+  {
+   "name": "Lonzo Ball",
+   "when": "2026-09-23"
+  }
+ ]
 }

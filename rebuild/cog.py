@@ -18,7 +18,7 @@ from . import stats as stats_mod
 from . import draft as draft_mod
 from . import embeds as E
 from . import league as L
-from .data import fetch_espn, league_from
+from .data import fetch_espn, league_from, refresh_snapshot
 from .sources import fetch_2k, fetch_contracts, name_key
 from .rumors import RumorFeed, TIER_BADGE, fetch_items, fold
 from .storage import Store
@@ -66,7 +66,7 @@ class OwnerView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("This isn't your front office. Start your own with `/rebuild start`.",
+            await interaction.response.send_message("This isn't your front office. Type `/rebuild` to run your own team.",
                                                     ephemeral=True)
             return False
         return True
@@ -173,7 +173,7 @@ class TradeView(OwnerView):
             if not save:
                 return
             if save["phase"] == "draft":
-                return await interaction.response.send_message("Finish the draft first (`/rebuild sim`).", ephemeral=True)
+                return await interaction.response.send_message("Finish the draft first (Home).", ephemeral=True)
             resp = await asyncio.to_thread(ai.respond, save, self.trade.copy())
             if resp.kind == "accept":
                 text = ai.apply_trade(save, self.trade)
@@ -275,6 +275,8 @@ class OffersView(OwnerView):
     async def _accept(self, interaction: discord.Interaction) -> None:
         async with self.cog.lock(self.user_id):
             save = await self.cog.get_save(self.user_id)
+            if not save or not self.offers:
+                return await interaction.response.send_message("That offer is no longer available.", ephemeral=True)
             offer = self.offers[self.idx]
             t = ai.Trade.from_dict(offer)
             problems = ai.validate(save, t)
@@ -381,10 +383,22 @@ class SimView(OwnerView):
         b.callback = cb
         self.add_item(b)
 
-    async def _run(self, interaction: discord.Interaction, work, make_embed) -> None:
+    async def _run(self, interaction: discord.Interaction, work, make_embed, when=None) -> None:
+        """Run one step of the season. `when(save)` says whether the step still applies: a
+        double-click or a button on an older message must not replay the playoffs or age the
+        league twice, so stale presses just show where the save is now."""
         await interaction.response.defer()
         async with self.cog.lock(self.user_id):
             save = await self.cog.get_save(self.user_id)
+            if save is None:
+                return await interaction.edit_original_response(content="Your save is gone.", embed=None, view=None)
+            if when is not None and not when(save):
+                from .hub import home_embed
+                self.build(save)
+                e = home_embed(save)
+                e.add_field(name="Already done", value="That button was out of date, so nothing changed. "
+                                                       "Here's where your season is now.", inline=False)
+                return await interaction.edit_original_response(embed=e, view=self.host() if (self.children or self.hub) else None)
             rng = random.Random()
             result = await asyncio.to_thread(work, save, rng)
             await self.cog.persist(save, interaction)
@@ -412,10 +426,10 @@ class SimView(OwnerView):
                         inline=False)
         if r.get("deadline"):
             msg = ("**Simulation paused for the deadline.** This is your last chance to trade until the summer "
-                   "(`/rebuild trade`, `/rebuild shop`), and a good time to extend players in the final year "
-                   "of their deals (`/rebuild extend`). Hit a sim button when you're done.")
+                   "(**Trade**, or **More → Shop a player**), and a good time to extend players in the final "
+                   "year of their deals (**More → Extensions**). Hit a sim button when you're done.")
             if r.get("inbox"):
-                msg = f"📞 {r['inbox']} team(s) sent you offers (`/rebuild inbox`). " + msg
+                msg = f"📞 {r['inbox']} team(s) sent you offers (**More → Offers inbox**). " + msg
             e.add_field(name="Deadline", value=msg, inline=False)
         elif save["phase"] == "stretch":
             e.set_footer(text="Trade deadline has passed · free agents can still be signed")
@@ -427,19 +441,23 @@ class SimView(OwnerView):
         return e
 
     async def week(self, interaction):
-        await self._run(interaction, lambda s, rng: sim.sim_chunk(s, rng, games=sim.WEEK), self._chunk_embed)
+        await self._run(interaction, lambda s, rng: sim.sim_chunk(s, rng, games=sim.WEEK), self._chunk_embed, _in_season)
 
     async def month(self, interaction):
-        await self._run(interaction, lambda s, rng: sim.sim_chunk(s, rng, games=sim.WEEK * 4), self._chunk_embed)
+        await self._run(interaction, lambda s, rng: sim.sim_chunk(s, rng, games=sim.WEEK * 4), self._chunk_embed,
+                        _in_season)
 
     async def to_deadline(self, interaction):
-        await self._run(interaction, sim.sim_to_deadline, self._chunk_embed)
+        await self._run(interaction, sim.sim_to_deadline, self._chunk_embed,
+                        lambda s: _in_season(s) and not s.get("deadline_done"))
 
     async def to_end_rs(self, interaction):
-        await self._run(interaction, lambda s, rng: sim.sim_chunk(s, rng, to=sim.TOTAL_GAMES), self._chunk_embed)
+        await self._run(interaction, lambda s, rng: sim.sim_chunk(s, rng, to=sim.TOTAL_GAMES), self._chunk_embed,
+                        _in_season)
 
     async def playoffs(self, interaction):
-        await self._run(interaction, sim.sim_postseason, lambda save, entry: E.season_embed(save, entry))
+        await self._run(interaction, sim.sim_postseason, lambda save, entry: E.season_embed(save, entry),
+                        lambda s: s["phase"] in SEASON_PHASES)
 
     async def offseason(self, interaction):
         def work(save, rng):
@@ -458,19 +476,22 @@ class SimView(OwnerView):
                         inline=False)
             e.set_footer(text=E.footer(save))
             return e
-        await self._run(interaction, work, embed)
+        await self._run(interaction, work, embed, lambda s: s["phase"] == "postseason")
 
     async def _draft_pick(self, interaction):
         pid = interaction.data["values"][0]
-        await self._do_draft(interaction, lambda save, rng: [sim.make_pick(save, pid)] + sim.advance_draft(save, rng))
+        await self._do_draft(interaction, lambda save, rng: [sim.make_pick(save, pid)] + sim.advance_draft(save, rng),
+                             lambda s: _my_pick(s) and any(p["id"] == pid for p in s["draft"]["prospects"]))
 
     async def auto_pick(self, interaction):
-        await self._do_draft(interaction, lambda save, rng: [sim.ai_pick(save, rng)] + sim.advance_draft(save, rng))
+        await self._do_draft(interaction, lambda save, rng: [sim.ai_pick(save, rng)] + sim.advance_draft(save, rng),
+                             _my_pick)
 
     async def auto_rest(self, interaction):
-        await self._do_draft(interaction, lambda save, rng: sim.advance_draft(save, rng, auto_user=True))
+        await self._do_draft(interaction, lambda save, rng: sim.advance_draft(save, rng, auto_user=True),
+                             lambda s: s["phase"] == "draft")
 
-    async def _do_draft(self, interaction, work):
+    async def _do_draft(self, interaction, work, when):
         def embed(save, lines):
             e = discord.Embed(title=f"🎟️ {save['season']} NBA Draft", color=E.color(save["team"]))
             e.add_field(name="Latest picks", value=_draft_log(save), inline=False)
@@ -483,7 +504,7 @@ class SimView(OwnerView):
                 e.add_field(name="Your free agents", value=_asks_text(save), inline=False)
             e.set_footer(text=E.footer(save))
             return e
-        await self._run(interaction, work, embed)
+        await self._run(interaction, work, embed, when)
 
     async def _resign(self, interaction):
         pid = interaction.data["values"][0]
@@ -503,16 +524,18 @@ class SimView(OwnerView):
                                                           f"{L.cap_status(save, save['team'])[0]}", inline=False)
             e.set_footer(text="Anyone you don't re-sign becomes a free agent (you keep his Bird rights).")
             return e
-        await self._run(interaction, work, embed)
+        await self._run(interaction, work, embed, lambda s: s["phase"] == "resign")
 
     async def open_fa(self, interaction):
         await self._run(interaction, sim.start_free_agency,
-                        lambda save, _: fa_embed(save, "🛒 Free agency is open. Make offers with `/rebuild freeagents`, "
-                                                       "then advance day by day. Stars weigh every offer before deciding."))
+                        lambda save, _: fa_embed(save, "🛒 Free agency is open. Make offers from **Free agents**, "
+                                                       "then advance day by day. Stars weigh every offer before deciding."),
+                        lambda s: s["phase"] == "resign")
 
     async def next_day(self, interaction):
         await self._run(interaction, fa.advance_day,
-                        lambda save, news: fa_embed(save, "\n".join(news[:8]) or "A quiet day. Nobody met their price."))
+                        lambda save, news: fa_embed(save, "\n".join(news[:8]) or "A quiet day. Nobody met their price."),
+                        lambda s: s["phase"] == "fa")
 
     async def next_season(self, interaction):
         def embed(save, r):
@@ -524,7 +547,19 @@ class SimView(OwnerView):
                 e.add_field(name="✂️ Final cuts", value=f"You waived {', '.join(r['cut'])} to get down to 15.", inline=False)
             e.set_footer(text=E.footer(save))
             return e
-        await self._run(interaction, sim.new_season, embed)
+        await self._run(interaction, sim.new_season, embed, lambda s: s["phase"] == "fa")
+
+
+SEASON_PHASES = ("preseason", "season", "deadline", "stretch")
+
+
+def _in_season(save: dict) -> bool:
+    return save["phase"] in SEASON_PHASES and not sim.season_over(save)
+
+
+def _my_pick(save: dict) -> bool:
+    slot = sim.on_the_clock(save) if save["phase"] == "draft" else None
+    return bool(slot) and slot["owner"] == save["team"]
 
 
 def _draft_log(save: dict) -> str:
@@ -641,6 +676,10 @@ class FAView(OwnerView):
         await interaction.response.defer()
         async with self.cog.lock(self.user_id):
             save = await self.cog.get_save(self.user_id)
+            if save["phase"] != "fa":
+                self.build(save)
+                return await interaction.edit_original_response(
+                    embed=fa_embed(save, "Free agency isn't running right now, so nothing changed."), view=self.host())
             news = await asyncio.to_thread(fa.advance_day, save, random.Random())
             await self.cog.persist(save, interaction)
             self.build(save)
@@ -972,15 +1011,6 @@ class Rebuild(commands.Cog):
     async def cog_load(self) -> None:
         await self.store.init()
         self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=40))
-        cached = await self.store.get_cache(LIVE_KEY)
-        if cached:
-            try:
-                self.live = L.unpack(cached[0])
-                self.last_league = cached[1]
-                self.feed.set_players(self.live["players"])
-                log.info("Loaded cached league (%d players)", len(self.live["players"]))
-            except Exception:
-                log.exception("Cached league unreadable")
         cached = await self.store.get_cache(EXTRAS_KEY)
         if cached:
             try:
@@ -988,6 +1018,20 @@ class Rebuild(commands.Cog):
                 self.last_extras = cached[1]
             except Exception:
                 log.exception("Cached contracts/ratings unreadable")
+        cached = await self.store.get_cache(LIVE_KEY)
+        if cached:
+            try:
+                live = L.unpack(cached[0])
+                self.last_league = cached[1]
+                try:   # pick up roster fixes and retirements shipped since the cache was built
+                    live = await asyncio.to_thread(refresh_snapshot, live, self.extras)
+                except Exception:
+                    log.exception("Couldn't re-apply roster data to the cached league")
+                self.live = live
+                self.feed.set_players(self.live["players"])
+                log.info("Loaded cached league (%d players)", len(self.live["players"]))
+            except Exception:
+                log.exception("Cached league unreadable")
         cached = await self.store.get_cache("rumors")
         if cached and self.live:
             try:
@@ -1104,7 +1148,7 @@ class Rebuild(commands.Cog):
     async def need_save(self, interaction: discord.Interaction) -> dict | None:
         save = await self.get_save(interaction.user.id)
         if not save:
-            await interaction.response.send_message("You don't run a team yet. Pick one with `/rebuild start`.",
+            await interaction.response.send_message("You don't run a team yet. Type `/rebuild` to pick one.",
                                                     ephemeral=True)
         return save
 

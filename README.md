@@ -48,7 +48,9 @@ That's it. The `/rebuild` commands sync with the rest on the next deploy, and sa
 
 ## Things to know
 
-Contract years beyond what ESPN lists are estimated with 5% raises, and player and team options are treated as guaranteed years. Draft pick ownership comes from `rebuild/data/picks.json`, a hand-maintained list of first-round picks that have already been traded (swaps are left out and protections are simplified). It's my best read as of October 2026, so check it and edit it if anything is off; new saves pick up changes immediately. Two-way players don't count against the cap or the 15-man roster. The salary-matching brackets follow the 2023 CBA structure scaled to 2026-27 and are close approximations.
+Contract years beyond what ESPN lists are estimated with 5% raises, and player and team options are treated as guaranteed years. Draft pick ownership comes from `rebuild/data/picks.json`, a hand-maintained list of first-round picks that have already been traded (swaps are left out and protections are simplified). It's my best read as of October 2026, so check it and edit it if anything is off; new saves pick up changes immediately. Two-way players don't count against the cap or the 15-man roster. Free agents can't be traded until December 15 (or three months after an in-season signing).
+
+Rosters follow each team's Basketball-Reference payroll: anyone ESPN still lists on a team that isn't on its payroll becomes a free agent. To fix anything the feeds get wrong, edit `rebuild/data/roster_overrides.json`: `players` moves a player and sets his contract (`"team": null` makes him a free agent), and `retired` removes players who have retired so they don't show up in free agency. The bot applies these on every restart, even if ESPN is down. Existing saves keep the rosters they started with; pick your team again from **More → Switch teams** to get today's rosters. The salary-matching brackets follow the 2023 CBA structure scaled to 2026-27 and are close approximations.
 
 ## Tests
 

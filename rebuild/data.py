@@ -246,8 +246,12 @@ def _reconcile(players: dict[str, dict], payrolls: dict[str, list[dict]], meta: 
             by_key.setdefault(key, []).append(p)
             assign(p, abbr, row)
             stats["added"] += 1
-    for p in players.values():                 # ESPN-only players without a real deal: free agents
-        if p.get("team") and p["id"] not in claimed and (p.get("est") or p.get("twoway")):
+    # A team's payroll is the source of truth for who is on it, so anyone ESPN still lists there
+    # (unsigned vets, waived players, stale contracts) becomes a free agent. On a team with no
+    # payroll data, only ESPN-only players without a real deal are released.
+    for p in players.values():
+        if p.get("team") and p["id"] not in claimed and (
+                p["team"] in payrolls or p.get("est") or p.get("twoway")):
             p["team"] = None
             p["salary"] = []
             p["twoway"] = False
@@ -256,27 +260,42 @@ def _reconcile(players: dict[str, dict], payrolls: dict[str, list[dict]], meta: 
     return stats
 
 
-def _apply_overrides(players: dict[str, dict]) -> int:
+def _load_overrides() -> dict:
     import json
     from pathlib import Path
-    from .sources import name_key
     try:
-        rows = json.loads((Path(__file__).parent / "data" / "roster_overrides.json").read_text())["players"]
-    except (OSError, ValueError, KeyError):
-        return 0
+        return json.loads((Path(__file__).parent / "data" / "roster_overrides.json").read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def _apply_overrides(players: dict[str, dict]) -> int:
+    from .sources import name_key
     n = 0
-    for row in rows:
+    for row in _load_overrides().get("players") or []:
         key = name_key(row["name"])
         p = next((q for q in players.values() if name_key(q["name"]) == key), None)
         if p is None:
             continue
-        p["team"] = row["team"]
-        p["salary"] = list(row["salary"])
+        team = row.get("team")
+        p["team"] = team if team in cba.TEAMS else None
+        p["salary"] = list(row.get("salary") or []) if p["team"] else []
         p["twoway"] = False
         p["est"] = False
         p["src"] = "override"
         n += 1
     return n
+
+
+def _apply_retirements(players: dict[str, dict]) -> list[str]:
+    """Drop retired players so they don't linger as free agents (they played last season, so
+    ESPN's stats still list them)."""
+    from .sources import name_key
+    gone = {name_key(r["name"]) for r in _load_overrides().get("retired") or []}
+    out = [pid for pid, p in players.items() if name_key(p["name"]) in gone]
+    for pid in out:
+        del players[pid]
+    return out
 
 
 def _apply_2k(players: dict[str, dict], ratings: dict[str, int]) -> int:
@@ -344,9 +363,15 @@ def build_league(rosters: dict[str, list[dict]], stats: dict[int, dict[str, dict
                         "status": "active", "hist": hist,
                         "pos": _position(m.get("pos", ""), hist[max(hist)])}
         fa_ids.append(pid)
+    return _finish(players, season, meta, extras)
+
+
+def _finish(players: dict[str, dict], season: int, meta: dict | None, extras: dict) -> dict:
+    """Payrolls, manual fixes, retirements, ratings and estimated contracts, then the snapshot."""
     payrolls = {} if extras.get("skip_payrolls") else load_payrolls(extras.get("contracts"))
     rec = _reconcile(players, payrolls, meta)
     n_over = _apply_overrides(players)
+    retired = _apply_retirements(players)
     rate_league(players, season)
     from .sources import snapshot_2k
     ratings = {**snapshot_2k(), **(extras.get("ratings") or {})}   # live site wins when reachable
@@ -358,7 +383,8 @@ def build_league(rosters: dict[str, list[dict]], stats: dict[int, dict[str, dict
             yrs = 4 if p["age"] <= 26 else 3 if p["age"] <= 30 else 2
             p["salary"] = [int(amt * 1.05 ** i) for i in range(yrs)]
     log.info("Payrolls: %(matched)d contracts matched, %(moved)d players moved, %(added)d added, "
-             "%(released)d released · %%d manual fixes · %%d NBA 2K27 ratings" % rec, n_over, n_2k)
+             "%(released)d released · %%d manual fixes · %%d retired · %%d NBA 2K27 ratings" % rec,
+             n_over, len(retired), n_2k)
     return {
         "season": season,
         "fetched": int(time.time()),
@@ -448,6 +474,14 @@ async def fetch_espn(session: aiohttp.ClientSession) -> dict | None:
         log.error("No stats from ESPN; keeping the previous snapshot")
         return None
     return {"season": season, "rosters": rosters, "stats": stats, "meta": meta}
+
+
+def refresh_snapshot(league: dict, extras: dict | None = None) -> dict:
+    """Re-apply today's payrolls, manual fixes and retirements to a cached league, so a deploy
+    with newer roster data takes effect even when ESPN can't be reached."""
+    import copy
+    players = copy.deepcopy(league["players"])
+    return {**_finish(players, league["season"], None, extras or {}), "fetched": league.get("fetched")}
 
 
 def league_from(raw: dict, extras: dict | None = None) -> dict:

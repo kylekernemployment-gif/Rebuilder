@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import math
 import random
+import zlib
 
 from . import ai, cba, chem, coaches, draft, stats, style
 from . import league as L
@@ -94,6 +95,14 @@ def calendar(save: dict) -> str:
         return "Preseason"
     start = datetime.date(save["season"] - 1, 10, 21)
     d = start + datetime.timedelta(days=int(idx / TOTAL_GAMES * SEASON_DAYS))
+    return d.strftime("%b %-d")
+
+
+def date_at(save: dict, idx: int) -> str:
+    """Calendar date of a game index in the current (or, in the offseason, next) season."""
+    import datetime
+    season = save["season"] + (0 if save["phase"] in ("preseason", "season", "deadline", "stretch") else 1)
+    d = datetime.date(season - 1, 10, 21) + datetime.timedelta(days=int(idx / TOTAL_GAMES * SEASON_DAYS))
     return d.strftime("%b %-d")
 
 
@@ -202,7 +211,7 @@ def _rest_for_b2b(save: dict, abbr: str, game_idx: int, playoffs: bool) -> None:
     if abbr == save["team"] and not (save.get("lineup") or {}).get("rest_b2b", True):
         return
     # roughly 14 back-to-backs a season; second nights are where teams rest guys
-    if (hash((save.get("sched_seed"), abbr, game_idx)) % 100) >= 17:
+    if zlib.crc32(f"{save.get('sched_seed')}:{abbr}:{game_idx}".encode()) % 100 >= 17:  # same nights every run
         return
     for p in L.roster(save, abbr)[:8]:
         if p.get("out", 0) <= 0 and load_managed(p):
@@ -888,6 +897,7 @@ def ai_free_agency(save: dict, rng: random.Random) -> list[str]:
                 used_mle.add(team)
             p["salary"] = [int(amt * (1.05 ** i)) for i in range(ask["years"] if how != "min" else 1)]
             p.pop("est", None)
+            p["signed"] = [season, None]
             L.move_player(save, pid, team)
             if p["ovr"] >= 78:
                 news.append(f"✍️ {p['name']} signs with the {cba.TEAMS[team].name} ({ask['years']} yrs, {cba.money(sum(p['salary']))})")
