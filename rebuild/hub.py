@@ -291,6 +291,9 @@ class HubView(OwnerView):
         if key == "home":
             page = SimView(cog, uid, save)
             embed = home_embed(save)
+            nb = discord.ui.Button(label="Start over with a new team", emoji="🔄", style=discord.ButtonStyle.danger, row=2)
+            nb.callback = self._go("newteam")
+            page.add_item(nb)
         elif key == "roster":
             abbr = kw.get("team") or self.view_team or save["team"]
             self.view_team = abbr

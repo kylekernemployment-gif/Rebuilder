@@ -187,6 +187,61 @@ def _apply_contracts(players: dict[str, dict], contracts: dict[str, dict[str, di
     return hits
 
 
+def _apply_rosters(players: dict[str, dict], contracts: dict[str, dict[str, dict]], season: int) -> int:
+    """Basketball-Reference payrolls catch signings before ESPN rosters do. A player listed on a
+    team's payroll (and not waived) belongs to that team; players we've never seen get created."""
+    import hashlib
+    from .sources import name_key
+    by_key = {}
+    for p in players.values():
+        by_key.setdefault(name_key(p["name"]), []).append(p)
+    moved = 0
+    for abbr, rows in contracts.items():
+        for key, row in rows.items():
+            if row.get("waived") or not row["salary"] or row["salary"][0] < 1_150_000:
+                continue
+            cands = by_key.get(key, [])
+            p = next((c for c in cands if c.get("team") == abbr), None) or (cands[0] if len(cands) == 1 else None)
+            if p is None and not cands:
+                pid = "bbr" + hashlib.sha1(key.encode()).hexdigest()[:10]
+                p = {"id": pid, "name": row["name"], "team": abbr, "age": 26, "exp": 4, "salary": list(row["salary"]),
+                     "inj": None, "jersey": "", "headshot": "", "status": "active", "hist": {}, "pos": "SF"}
+                players[pid] = p
+                by_key[key] = [p]
+                moved += 1
+                continue
+            if p is not None and p.get("team") != abbr:
+                p["team"] = abbr
+                p["salary"] = list(row["salary"])
+                p["twoway"] = False
+                p["est"] = False
+                moved += 1
+    return moved
+
+
+def _apply_overrides(players: dict[str, dict]) -> int:
+    import json
+    from pathlib import Path
+    from .sources import name_key
+    try:
+        rows = json.loads((Path(__file__).parent / "data" / "roster_overrides.json").read_text())["players"]
+    except (OSError, ValueError, KeyError):
+        return 0
+    n = 0
+    for row in rows:
+        key = name_key(row["name"])
+        p = next((q for q in players.values() if name_key(q["name"]) == key), None)
+        if p is None:
+            continue
+        p["team"] = row["team"]
+        p["salary"] = list(row["salary"])
+        p["twoway"] = False
+        p["est"] = False
+        p["src"] = "override"
+        n += 1
+    return n
+
+
 def _apply_2k(players: dict[str, dict], ratings: dict[str, int]) -> int:
     """Use NBA 2K27 overalls where we have them; re-scale our own ratings for everyone else."""
     from .sources import name_key
@@ -253,22 +308,26 @@ def build_league(rosters: dict[str, list[dict]], stats: dict[int, dict[str, dict
                         "pos": _position(m.get("pos", ""), hist[max(hist)])}
         fa_ids.append(pid)
     n_contracts = _apply_contracts(players, extras.get("contracts") or {})
+    n_moved = _apply_rosters(players, extras.get("contracts") or {}, season)
+    n_over = _apply_overrides(players)
     rate_league(players, season)
-    n_2k = _apply_2k(players, extras.get("ratings") or {}) if extras.get("ratings") else 0
+    from .sources import snapshot_2k
+    ratings = {**snapshot_2k(), **(extras.get("ratings") or {})}   # live site wins when reachable
+    n_2k = _apply_2k(players, ratings)
     from .ai import market_salary
     for p in players.values():
         if p.get("est") and p.get("team"):
             amt = int(round(market_salary(p["ovr"], season), -5))
             yrs = 4 if p["age"] <= 26 else 3 if p["age"] <= 30 else 2
             p["salary"] = [int(amt * 1.05 ** i) for i in range(yrs)]
-    if n_contracts or n_2k:
-        log.info("Applied %d Basketball-Reference contracts and %d NBA 2K27 ratings", n_contracts, n_2k)
+    log.info("Applied %d Basketball-Reference contracts, %d roster fixes, %d manual fixes, %d NBA 2K27 ratings",
+             n_contracts, n_moved, n_over, n_2k)
     return {
         "season": season,
         "fetched": int(time.time()),
         "players": players,
-        "teams": {abbr: [p["id"] for p in plist] for abbr, plist in rosters.items()},
-        "fa": fa_ids,
+        "teams": {abbr: [pid for pid, p in players.items() if p.get("team") == abbr] for abbr in cba.TEAMS},
+        "fa": [pid for pid in players if not players[pid].get("team")],
         "sources": {"contracts": n_contracts, "ratings": n_2k},
     }
 

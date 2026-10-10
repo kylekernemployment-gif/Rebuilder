@@ -33,6 +33,17 @@ BROWSER = {
 }
 BBREF_DELAY = 3.5   # Basketball-Reference allows ~20 requests a minute
 TWOK_DELAY = 2.0
+SNAPSHOT_2K = __import__("pathlib").Path(__file__).parent / "data" / "ratings_2k27.json"
+
+
+def snapshot_2k() -> dict[str, int]:
+    """Bundled NBA 2K27 ratings (all 30 teams), used whenever the live site can't be reached."""
+    import json
+    try:
+        rows = json.loads(SNAPSHOT_2K.read_text())["ratings"]
+    except (OSError, ValueError, KeyError):
+        return {}
+    return {name_key(r["name"]): int(r["ovr"]) for r in rows}
 
 
 def _text(s: str) -> str:
@@ -40,7 +51,9 @@ def _text(s: str) -> str:
 
 
 def name_key(name: str) -> str:
-    return re.sub(r" (jr|sr|ii|iii|iv)$", "", fold(name))
+    """'C.J. McCollum', 'CJ McCollum' and 'Day’Ron Sharpe' all match their ESPN spellings."""
+    s = (name or "").replace(".", "").replace("'", "").replace("’", "")
+    return re.sub(r" (jr|sr|ii|iii|iv|v)$", "", fold(s))
 
 
 async def _html(session: aiohttp.ClientSession, url: str) -> str | None:
@@ -74,6 +87,7 @@ def parse_bbref_contracts(page: str) -> dict[str, dict]:
         name = _text(m.group(1))
         if not name or "total" in name.lower():
             continue
+        waived = bool(re.search(r"<(em|i)\b|italic|waived|dead", m.group(0), re.I))
         years = re.findall(r'data-stat="y(\d)"[^>]*>(.*?)</td>', row, re.S)
         salaries: list[int] = []
         if years:
@@ -86,7 +100,7 @@ def parse_bbref_contracts(page: str) -> dict[str, dict]:
             amts = [int(re.sub(r"[^\d]", "", a)) for a in re.findall(r"\$[\d,]+", _text(row))]
             salaries = amts[:-1] if len(amts) > 1 else amts
         if salaries:
-            out[name_key(name)] = {"salary": salaries[:6], "name": name}
+            out[name_key(name)] = {"salary": salaries[:6], "name": name, "waived": waived}
     return out
 
 
@@ -127,6 +141,11 @@ def parse_2k_ratings(page: str, known: set[str]) -> dict[str, int]:
 
     Each player's overall is the first rating box (or bare two-digit number) after his name."""
     out: dict[str, int] = {}
+    # Team pages also show older games' rosters further down: only read the NBA 2K27 section.
+    start = page.find("2K27")
+    if start >= 0:
+        end = page.find("2K26", start)
+        page = page[start:end] if end > start else page[start:]
     anchors = [(m.end(), name_key(_text(m.group(1)))) for m in _ANCHOR.finditer(page)]
     for i, (end, key) in enumerate(anchors):
         if key not in known or key in out:

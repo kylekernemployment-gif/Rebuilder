@@ -30,7 +30,7 @@ RUMOR_REFRESH_SECS = 10 * 60
 VIEW_TIMEOUT = 15 * 60
 MAX_CACHED_SAVES = 20
 EXTRAS_REFRESH_SECS = 12 * 3600
-LIVE_KEY = "live_league_v3"
+LIVE_KEY = "live_league_v4"
 EXTRAS_KEY = "extras_v1"
 NO_PINGS = discord.AllowedMentions.none()
 

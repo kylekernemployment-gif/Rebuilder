@@ -1,0 +1,46 @@
+{
+ "_note": "Manual roster/contract fixes for signings the free data sources haven't caught up with yet. Applied after ESPN and Basketball-Reference. Salaries are split from reported totals with standard 5% raises.",
+ "players": [
+  {
+   "name": "Quentin Grimes",
+   "team": "LAL",
+   "salary": [
+    13920000,
+    14620000,
+    15350000,
+    16110000
+   ],
+   "source": "Shams Charania via Bleacher Report, July 1, 2026: 4 years, $60M"
+  },
+  {
+   "name": "Sandro Mamukelashvili",
+   "team": "LAL",
+   "salary": [
+    12060000,
+    12670000,
+    13300000,
+    13970000
+   ],
+   "source": "ClutchPoints: 4 years, $52M"
+  },
+  {
+   "name": "Luke Kennard",
+   "team": "PHX",
+   "salary": [
+    6340000,
+    6660000
+   ],
+   "source": "TSN: 2 years, $13M"
+  },
+  {
+   "name": "Jordan Goodwin",
+   "team": "PHX",
+   "salary": [
+    6030000,
+    6330000,
+    6640000
+   ],
+   "source": "NBA.com / ClutchPoints: 3 years, $19M"
+  }
+ ]
+}

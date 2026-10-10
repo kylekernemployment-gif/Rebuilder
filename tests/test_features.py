@@ -108,3 +108,29 @@ def test_deadline_stops_sim_and_ai_trades_happen():
     r = sim.sim_chunk(s, random.Random(4), to=sim.TOTAL_GAMES)
     assert s["game_idx"] == sim.deadline_idx() and r["deadline"] and s["phase"] == "deadline"
     assert 8 <= len(r["trades"]) <= 30
+
+
+def test_2k27_snapshot_and_roster_fixes():
+    from rebuild.data import build_league, parse_roster
+    snap = sources.snapshot_2k()
+    assert len(snap) > 500 and snap["jalen brunson"] == 96 and snap["cj mccollum"] == 83
+    assert sources.name_key("Day’Ron Sharpe") == sources.name_key("Day'Ron Sharpe") == "dayron sharpe"
+    roster = {"athletes": [
+        {"id": "1", "displayName": "Jalen Brunson", "age": 30, "position": {"abbreviation": "PG"},
+         "contract": {"salary": 43_000_000, "yearsRemaining": 3}},
+        {"id": "2", "displayName": "Quentin Grimes", "age": 26, "position": {"abbreviation": "SG"}}]}
+    rosters = {a: [] for a in cba.TEAMS}
+    rosters["NYK"] = parse_roster(roster, "NYK", 2027)
+    stats = {2026: {"1": {"gp": 75, "mpg": 35, "pts": 26}, "2": {"gp": 70, "mpg": 28, "pts": 14}}}
+    lg = build_league(rosters, stats, 2027)
+    assert lg["players"]["1"]["ovr"] == 96 and lg["players"]["1"]["ovr_src"] == "2K27"
+    g = lg["players"]["2"]
+    assert g["team"] == "LAL" and g["salary"][0] > 13_000_000 and len(g["salary"]) == 4
+    assert "2" in lg["teams"]["LAL"]
+
+
+def test_2k_parser_ignores_older_games():
+    page = TWOK.replace("<table>", "<h2>NBA 2K27 Roster</h2><table>") + \
+        '<h2>NBA 2K26</h2><a href="x">Jalen Duren</a><span class="attribute-box">80</span>'
+    got = sources.parse_2k_ratings(page, {"jalen duren"})
+    assert got == {"jalen duren": 85}
