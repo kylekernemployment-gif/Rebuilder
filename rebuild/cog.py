@@ -30,7 +30,7 @@ RUMOR_REFRESH_SECS = 10 * 60
 VIEW_TIMEOUT = 15 * 60
 MAX_CACHED_SAVES = 20
 EXTRAS_REFRESH_SECS = 12 * 3600
-LIVE_KEY = "live_league_v4"
+LIVE_KEY = "live_league_v5"
 EXTRAS_KEY = "extras_v1"
 NO_PINGS = discord.AllowedMentions.none()
 
@@ -231,49 +231,85 @@ class TradeView(OwnerView):
 # ------------------------------------------------------------------------------------------
 
 class OffersView(OwnerView):
-    def __init__(self, cog: "Rebuild", user_id: int, offers: list[dict], source: str):
+    """One offer at a time, with Previous / Next / Accept."""
+
+    def __init__(self, cog: "Rebuild", user_id: int, offers: list[dict], source: str,
+                 title: str = "📞 Trade offers", intro: str = ""):
         super().__init__(cog, user_id)
         self.offers = offers
         self.source = source
-        for i, _ in enumerate(offers[:5]):
-            b = discord.ui.Button(label=f"Accept offer {i + 1}", style=discord.ButtonStyle.success, row=0)
-            b.callback = self._make_cb(i)
+        self.title = title
+        self.intro = intro
+        self.idx = 0
+        self.build()
+
+    def build(self) -> None:
+        self.clear_items()
+        n = len(self.offers)
+        prev = discord.ui.Button(label="Previous", emoji="◀️", style=discord.ButtonStyle.secondary, row=0,
+                                 disabled=self.idx == 0)
+        nxt = discord.ui.Button(label=f"Next offer ({min(self.idx + 2, n)}/{n})" if self.idx < n - 1 else "No more offers",
+                                emoji="▶️", style=discord.ButtonStyle.primary, row=0, disabled=self.idx >= n - 1)
+        acc = discord.ui.Button(label="Accept this offer", emoji="✅", style=discord.ButtonStyle.success, row=0)
+        prev.callback = self._prev
+        nxt.callback = self._next
+        acc.callback = self._accept
+        for b in (prev, nxt, acc):
             self.add_item(b)
 
-    def _make_cb(self, i: int):
-        async def cb(interaction: discord.Interaction) -> None:
-            async with self.cog.lock(self.user_id):
-                save = await self.cog.get_save(self.user_id)
-                t = ai.Trade.from_dict(self.offers[i])
-                problems = ai.validate(save, t)
-                if problems:
-                    return await interaction.response.send_message(
-                        "That offer is no longer valid:\n" + "\n".join(f"• {p}" for p in problems), ephemeral=True)
-                ai.apply_trade(save, t)
-                save["trades"] = save.get("trades", 0) + 1
-                if self.source == "inbox":
-                    save["inbox"] = [o for o in save.get("inbox", []) if o != self.offers[i]]
-                await self.cog.persist(save, interaction)
-                get, give = E.offer_lines(save, t, save["team"])
-                other = t.a if t.b == save["team"] else t.b
-                e = discord.Embed(title=f"✅ Deal done with the {cba.TEAMS[other].name}", color=E.color(other),
-                                  description=f"**You get:** {get}\n**You send:** {give}")
-                waived = save.get("last_waived", {}).get(save["team"])
-                if waived:
-                    e.add_field(name="✂️ Roster moves", value=f"You waived {', '.join(waived)} to make room.")
-                self.stop()
-                await interaction.response.edit_message(embed=e, view=self.done_view())
-        return cb
+    def embed(self, save: dict) -> discord.Embed:
+        return offers_embed(save, self.offers, self.title, self.intro, self.idx)
+
+    async def _move(self, interaction: discord.Interaction, step: int) -> None:
+        save = await self.cog.get_save(self.user_id)
+        self.idx = max(0, min(len(self.offers) - 1, self.idx + step))
+        self.build()
+        await interaction.response.edit_message(embed=self.embed(save), view=self.host())
+
+    async def _prev(self, interaction: discord.Interaction) -> None:
+        await self._move(interaction, -1)
+
+    async def _next(self, interaction: discord.Interaction) -> None:
+        await self._move(interaction, 1)
+
+    async def _accept(self, interaction: discord.Interaction) -> None:
+        async with self.cog.lock(self.user_id):
+            save = await self.cog.get_save(self.user_id)
+            offer = self.offers[self.idx]
+            t = ai.Trade.from_dict(offer)
+            problems = ai.validate(save, t)
+            if problems:
+                return await interaction.response.send_message(
+                    "That offer is no longer valid:\n" + "\n".join(f"• {p}" for p in problems), ephemeral=True)
+            ai.apply_trade(save, t)
+            save["trades"] = save.get("trades", 0) + 1
+            if self.source == "inbox":
+                save["inbox"] = [o for o in save.get("inbox", []) if o != offer]
+            await self.cog.persist(save, interaction)
+            get, give = E.offer_lines(save, t, save["team"])
+            other = t.a if t.b == save["team"] else t.b
+            e = discord.Embed(title=f"✅ Deal done with the {cba.TEAMS[other].name}", color=E.color(other),
+                              description=f"**You get:** {get}\n**You send:** {give}")
+            waived = save.get("last_waived", {}).get(save["team"])
+            if waived:
+                e.add_field(name="✂️ Roster moves", value=f"You waived {', '.join(waived)} to make room.")
+            self.stop()
+            await interaction.response.edit_message(embed=e, view=self.done_view())
 
 
-def offers_embed(save: dict, offers: list[dict], title: str, intro: str) -> discord.Embed:
+def offers_embed(save: dict, offers: list[dict], title: str, intro: str, idx: int = 0) -> discord.Embed:
     e = discord.Embed(title=title, color=E.color(save["team"]), description=intro)
-    for i, o in enumerate(offers[:5], 1):
-        t = ai.Trade.from_dict(o)
-        other = t.a if t.b == save["team"] else t.b
-        get, give = E.offer_lines(save, t, save["team"])
-        e.add_field(name=f"{i}. {cba.TEAMS[other].full} ({ai.MODES[ai.mode_of(save, other)]})",
-                    value=f"**You get:** {get}\n**You send:** {give}"[:1024], inline=False)
+    if not offers:
+        e.description = (intro + "\n\n" if intro else "") + "No offers."
+        return e
+    o = offers[idx]
+    t = ai.Trade.from_dict(o)
+    other = t.a if t.b == save["team"] else t.b
+    get, give = E.offer_lines(save, t, save["team"])
+    note = o.get("note") or ""
+    e.add_field(name=f"Offer {idx + 1} of {len(offers)} · {cba.TEAMS[other].full}",
+                value=(f"{ai.MODES[ai.mode_of(save, other)]}" + (f"\n{note}" if note else "")
+                       + f"\n\n**You get:** {get}\n**You send:** {give}")[:1024], inline=False)
     e.set_footer(text=E.footer(save))
     return e
 

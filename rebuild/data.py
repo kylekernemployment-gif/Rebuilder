@@ -162,61 +162,98 @@ def parse_stats_page(page_json: dict, meta: dict | None = None) -> tuple[dict[st
     return out, pages
 
 
-def _apply_contracts(players: dict[str, dict], contracts: dict[str, dict[str, dict]]) -> int:
-    """Overwrite ESPN contract numbers with Basketball-Reference's (newer and complete)."""
-    from .sources import name_key
-    hits = 0
-    by_name: dict[str, list[dict]] = {}
-    for abbr, rows in contracts.items():
-        for key, row in rows.items():
-            by_name.setdefault(key, []).append({**row, "team": abbr})
-    for p in players.values():
-        rows = by_name.get(name_key(p["name"]))
-        if not rows:
-            continue
-        row = next((r for r in rows if r["team"] == p.get("team")), rows[0] if len(rows) == 1 else None)
-        if not row:
-            continue
-        sal = row["salary"]
-        if sal and sal[0] >= 1_150_000:
-            p["salary"] = list(sal)
-            p["twoway"] = False
-            p["est"] = False
-            p["src"] = "bbref"
-            hits += 1
-    return hits
+def load_payrolls(live: dict[str, dict[str, dict]] | None = None) -> dict[str, list[dict]]:
+    """Team payrolls: the bundled Basketball-Reference snapshot, replaced team by team with
+    live copies whenever the bot could fetch them."""
+    import json
+    from pathlib import Path
+    try:
+        snap = json.loads((Path(__file__).parent / "data" / "contracts_snapshot.json").read_text())["teams"]
+    except (OSError, ValueError, KeyError):
+        snap = {}
+    out = {abbr: list(rows) for abbr, rows in snap.items() if abbr in cba.TEAMS}
+    for abbr, rows in (live or {}).items():
+        if abbr in cba.TEAMS and len(rows) >= 10:
+            out[abbr] = [{"name": r["name"], "salary": r["salary"], "waived": r.get("waived", False)}
+                         for r in rows.values()]
+    return out
 
 
-def _apply_rosters(players: dict[str, dict], contracts: dict[str, dict[str, dict]], season: int) -> int:
-    """Basketball-Reference payrolls catch signings before ESPN rosters do. A player listed on a
-    team's payroll (and not waived) belongs to that team; players we've never seen get created."""
+def _reconcile(players: dict[str, dict], payrolls: dict[str, list[dict]], meta: dict | None) -> dict[str, int]:
+    """Make rosters and contracts match each team's real payroll.
+
+    Each payroll row is matched to a player (same team first, then anywhere by name, then by last
+    name on that team for spelling differences like Alex/Alexandre Sarr). Matched players get the
+    real contract (empty salary = two-way/camp deal). Players a payroll lists who are missing from
+    ESPN are added. ESPN-only players with no real contract are released to free agency."""
     import hashlib
     from .sources import name_key
-    by_key = {}
+    stats = {"matched": 0, "moved": 0, "added": 0, "released": 0}
+    if not payrolls:
+        return stats
+    by_key: dict[str, list[dict]] = {}
     for p in players.values():
         by_key.setdefault(name_key(p["name"]), []).append(p)
-    moved = 0
-    for abbr, rows in contracts.items():
-        for key, row in rows.items():
-            if row.get("waived") or not row["salary"] or row["salary"][0] < 1_150_000:
-                continue
-            cands = by_key.get(key, [])
-            p = next((c for c in cands if c.get("team") == abbr), None) or (cands[0] if len(cands) == 1 else None)
-            if p is None and not cands:
-                pid = "bbr" + hashlib.sha1(key.encode()).hexdigest()[:10]
-                p = {"id": pid, "name": row["name"], "team": abbr, "age": 26, "exp": 4, "salary": list(row["salary"]),
-                     "inj": None, "jersey": "", "headshot": "", "status": "active", "hist": {}, "pos": "SF"}
-                players[pid] = p
-                by_key[key] = [p]
-                moved += 1
-                continue
-            if p is not None and p.get("team") != abbr:
-                p["team"] = abbr
-                p["salary"] = list(row["salary"])
-                p["twoway"] = False
-                p["est"] = False
-                moved += 1
-    return moved
+    meta_by_key = {name_key(m["name"]): (pid, m) for pid, m in (meta or {}).items()}
+    claimed: set[str] = set()
+
+    def assign(p: dict, abbr: str, row: dict) -> None:
+        if p.get("team") != abbr:
+            stats["moved"] += 1
+        p["team"] = abbr
+        sal = list(row["salary"])
+        p["salary"] = sal
+        p["twoway"] = not sal or sal[0] < 1_150_000
+        p["est"] = False
+        p["src"] = "bbref"
+        claimed.add(p["id"])
+        stats["matched"] += 1
+
+    for abbr, rows in payrolls.items():
+        rows = [r for r in rows if not r.get("waived")]
+        pending = []
+        for row in rows:                       # pass 1: same name, same team
+            key = name_key(row["name"])
+            p = next((c for c in by_key.get(key, []) if c.get("team") == abbr and c["id"] not in claimed), None)
+            if p:
+                assign(p, abbr, row)
+            else:
+                pending.append(row)
+        later = []
+        for row in pending:                    # pass 2: same name anywhere (trades, signings)
+            cands = [c for c in by_key.get(name_key(row["name"]), []) if c["id"] not in claimed]
+            if len(cands) == 1:
+                assign(cands[0], abbr, row)
+            else:
+                later.append(row)
+        rest = []
+        for row in later:                      # pass 3: last name on this team (spelling differences)
+            last = name_key(row["name"]).split(" ")[-1]
+            cands = [p for p in players.values() if p.get("team") == abbr and p["id"] not in claimed
+                     and name_key(p["name"]).split(" ")[-1] == last]
+            if len(cands) == 1:
+                assign(cands[0], abbr, row)
+            else:
+                rest.append(row)
+        for row in rest:                       # pass 4: not in ESPN's data at all: add him
+            key = name_key(row["name"])
+            mid, m = meta_by_key.get(key, (None, {}))
+            pid = mid if mid and mid not in players else "bbr" + hashlib.sha1(key.encode()).hexdigest()[:10]
+            p = {"id": pid, "name": row["name"], "team": None, "age": int(m.get("age") or 25), "exp": 3,
+                 "salary": [], "inj": None, "jersey": "", "headshot": m.get("headshot", ""), "status": "active",
+                 "hist": {}, "pos": _position(m.get("pos", ""), None) if m else "SF"}
+            players[pid] = p
+            by_key.setdefault(key, []).append(p)
+            assign(p, abbr, row)
+            stats["added"] += 1
+    for p in players.values():                 # ESPN-only players without a real deal: free agents
+        if p.get("team") and p["id"] not in claimed and (p.get("est") or p.get("twoway")):
+            p["team"] = None
+            p["salary"] = []
+            p["twoway"] = False
+            p["est"] = False
+            stats["released"] += 1
+    return stats
 
 
 def _apply_overrides(players: dict[str, dict]) -> int:
@@ -307,8 +344,8 @@ def build_league(rosters: dict[str, list[dict]], stats: dict[int, dict[str, dict
                         "status": "active", "hist": hist,
                         "pos": _position(m.get("pos", ""), hist[max(hist)])}
         fa_ids.append(pid)
-    n_contracts = _apply_contracts(players, extras.get("contracts") or {})
-    n_moved = _apply_rosters(players, extras.get("contracts") or {}, season)
+    payrolls = {} if extras.get("skip_payrolls") else load_payrolls(extras.get("contracts"))
+    rec = _reconcile(players, payrolls, meta)
     n_over = _apply_overrides(players)
     rate_league(players, season)
     from .sources import snapshot_2k
@@ -320,15 +357,15 @@ def build_league(rosters: dict[str, list[dict]], stats: dict[int, dict[str, dict
             amt = int(round(market_salary(p["ovr"], season), -5))
             yrs = 4 if p["age"] <= 26 else 3 if p["age"] <= 30 else 2
             p["salary"] = [int(amt * 1.05 ** i) for i in range(yrs)]
-    log.info("Applied %d Basketball-Reference contracts, %d roster fixes, %d manual fixes, %d NBA 2K27 ratings",
-             n_contracts, n_moved, n_over, n_2k)
+    log.info("Payrolls: %(matched)d contracts matched, %(moved)d players moved, %(added)d added, "
+             "%(released)d released · %%d manual fixes · %%d NBA 2K27 ratings" % rec, n_over, n_2k)
     return {
         "season": season,
         "fetched": int(time.time()),
         "players": players,
         "teams": {abbr: [pid for pid, p in players.items() if p.get("team") == abbr] for abbr in cba.TEAMS},
         "fa": [pid for pid in players if not players[pid].get("team")],
-        "sources": {"contracts": n_contracts, "ratings": n_2k},
+        "sources": {"contracts": rec["matched"], "ratings": n_2k},
     }
 
 

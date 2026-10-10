@@ -60,4 +60,4 @@ def fake_espn(seed: int = 7, season: int = 2027):
         page = {"categories": cats, "athletes": [r for y, r in stat_rows if y == yr], "pagination": {"pages": 1}}
         stats[yr] = parse_stats_page(page)[0]
     rosters = {a: parse_roster(j, a, season) for a, j in rosters_json.items()}
-    return build_league(rosters, stats, season)
+    return build_league(rosters, stats, season, extras={"skip_payrolls": True})

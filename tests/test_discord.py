@@ -150,7 +150,14 @@ def test_everything_runs_from_the_hub(cog):
         # shop
         await menu(hub, "shop")
         mine = L.roster(save, "NYK", include_twoway=False)[1]
-        await choose(hub, "Put a player on the block", mine["id"])
+        x = await choose(hub, "Put a player on the block", mine["id"])
+        if any(getattr(c, "label", "") == "Accept this offer" for c in hub.children):
+            assert "Offer 1 of" in x.last_embed().fields[0].name
+            nxt = find(hub, "button", "Next offer")
+            if not nxt.disabled:
+                y = await click(hub, "Next offer")
+                assert "Offer 2 of" in y.last_embed().fields[0].name
+                await click(hub, "Previous")
         # season: week, deadline, end, playoffs, offseason
         await click(hub, "Home")
         await click(hub, "Sim 1 week")

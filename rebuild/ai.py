@@ -578,17 +578,53 @@ def best_package(save: dict, buyer: str, seller: str, pid: str, seller_must_agre
     return None
 
 
-def shop_player(save: dict, pid: str, limit: int = 3) -> list[tuple[Trade, float]]:
-    """Offers from AI teams for one of the user's players, best first (by a neutral valuation)."""
+def offer_note(save: dict, t: Trade, worth: float, his_value: float) -> str:
+    """Why this team is in, and how good the offer is."""
+    buyer = t.a
+    mode = mode_of(save, buyer)
+    p = save["players"][t.b_out[0][2:]]
+    why = {"contend": "Contender looking for a win-now piece",
+           "middle": "Trying to climb into the playoff picture",
+           "rebuild": "Rebuilding team buying a young piece" if p["age"] <= 25 else "Rebuilding team taking on salary"}[mode]
+    if L.payroll(save, buyer) < cba.cap_sheet(L.cap_year(save))["cap"]:
+        why += " · has cap space"
+    r = worth / his_value if his_value > 0 else 1.0
+    grade = "💰 Strong offer" if r >= 1.05 else "👍 Fair offer" if r >= 0.85 else "🤏 Light offer"
+    return f"{grade} · {why}"
+
+
+def wants(save: dict, buyer: str, p: dict) -> bool:
+    """Would this team even pick up the phone? Contenders want rotation upgrades, rebuilders want
+    youth (or a cheap expiring deal they can flip), everyone else wants someone who'd play."""
+    mode = mode_of(save, buyer)
+    ovrs = sorted((q["ovr"] for q in L.roster(save, buyer, include_twoway=False)), reverse=True)
+    rank_slot = sum(1 for o in ovrs if o > p["ovr"])
+    if mode == "contend":
+        return rank_slot <= 7 and p["age"] <= 34
+    if mode == "rebuild":
+        return p["age"] <= 26 or (len(p.get("salary") or []) <= 1 and p["ovr"] >= 72)
+    return rank_slot <= 9
+
+
+def shop_player(save: dict, pid: str, limit: int = 12) -> list[tuple[Trade, float]]:
+    """Every AI team that can make a real, legal, competitive offer for one of the user's players,
+    best first. Teams sit out when they can't afford him under the CBA, don't value him, or don't
+    have enough to put together an offer that's close to his worth, so stars on big deals draw a
+    few serious bidders and cheap, useful players draw a crowd."""
     seller = save["team"]
+    p = save["players"][pid]
+    his_value = player_value(p, "middle", save["season"])
     offers = []
     for buyer in cba.TEAMS:
-        if buyer == seller:
+        if buyer == seller or not wants(save, buyer, p):
             continue
         t = best_package(save, buyer, seller, pid, seller_must_agree=False)
-        if t:
-            worth = sum(_asset_value(save, a, "middle") for a in t.a_out)
-            offers.append((t, worth))
+        if not t:
+            continue
+        worth = sum(_asset_value(save, a, "middle") for a in t.a_out)
+        if his_value > 0 and worth < 0.55 * his_value:
+            continue  # they know they can't be competitive, so they don't call
+        offers.append((t, worth))
     offers.sort(key=lambda x: -x[1])
     return offers[:limit]
 

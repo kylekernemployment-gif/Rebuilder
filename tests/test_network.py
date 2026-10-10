@@ -78,7 +78,7 @@ def test_fetch_league_and_rumors_against_fake_server(monkeypatch):
         monkeypatch.setattr(rumors, "ESPN_NEWS", base + "/news")
         monkeypatch.setattr(rumors, "REDDIT_RSS", base + "/reddit")
         async with aiohttp.ClientSession() as s:
-            league = await data.fetch_league(s)
+            league = await data.fetch_league(s, {"skip_payrolls": True})
             items = await rumors.fetch_items(s)
         await runner.cleanup()
         return league, items

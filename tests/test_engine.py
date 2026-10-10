@@ -158,6 +158,8 @@ def test_missing_contract_is_estimated_not_two_way():
     assert not p["twoway"] and p["est"]
     stats = {2026: {"9": {"gp": 78, "mpg": 30, "pts": 12, "reb": 10, "ast": 2, "blk": 1, "stl": 0.7,
                           "fgm": 5, "fga": 7.5, "ftm": 2, "fta": 3, "tov": 1.5, "pf": 3}}}
-    lg = build_league({"DET": [p]}, stats, 2027)
+    lg = build_league({"DET": [p]}, stats, 2027, extras={"skip_payrolls": True})
     q = lg["players"]["9"]
     assert q["salary"] and q["salary"][0] > 2_000_000 and len(q["salary"]) == 4
+    real = build_league({"DET": [parse_roster(roster, "DET", 2027)[0]]}, stats, 2027)["players"]["9"]
+    assert real["salary"][0] == 40_160_643 and len(real["salary"]) == 5   # his actual new deal

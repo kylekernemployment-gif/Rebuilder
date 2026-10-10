@@ -1,0 +1,4783 @@
+{
+"_note": "Basketball-Reference team payrolls, snapshot October 10, 2026 (2026-27 onward). Rows with no salary are two-way or camp deals; waived rows are dead money only. The bot refreshes these live when it can reach the site.",
+"teams": {
+"ATL": [
+{
+"name": "Jalen Johnson",
+"salary": [
+30000000,
+30000000,
+30000000,
+30000000
+],
+"waived": false
+},
+{
+"name": "Dyson Daniels",
+"salary": [
+25000000,
+25000000,
+25000000,
+25000000
+],
+"waived": false
+},
+{
+"name": "CJ McCollum",
+"salary": [
+21000000
+],
+"waived": false
+},
+{
+"name": "Luguentz Dort",
+"salary": [
+18222222
+],
+"waived": false
+},
+{
+"name": "Onyeka Okongwu",
+"salary": [
+16120000,
+16880000
+],
+"waived": false
+},
+{
+"name": "Nickeil Alexander-Walker",
+"salary": [
+14403710,
+15161800,
+15919890
+],
+"waived": false
+},
+{
+"name": "Jock Landale",
+"salary": [
+14100000
+],
+"waived": false
+},
+{
+"name": "Corey Kispert",
+"salary": [
+13975000,
+13050000,
+13050000
+],
+"waived": false
+},
+{
+"name": "Dorian Finney-Smith",
+"salary": [
+13335000,
+13335000,
+13335000
+],
+"waived": false
+},
+{
+"name": "Aaron Wiggins",
+"salary": [
+9224300,
+8345797,
+8345797
+],
+"waived": false
+},
+{
+"name": "Kingston Flemings",
+"salary": [
+7348680,
+7716120,
+8083680,
+10282441
+],
+"waived": false
+},
+{
+"name": "Zuby Ejiofor",
+"salary": [
+3453360,
+3626160,
+3798360,
+6445818
+],
+"waived": false
+},
+{
+"name": "Asa Newell",
+"salary": [
+3399480,
+3560880,
+6042814
+],
+"waived": false
+},
+{
+"name": "Mouhamed Gueye",
+"salary": [
+2406205
+],
+"waived": false
+},
+{
+"name": "Henri Veesaar",
+"salary": [
+1357763,
+2294370,
+2694363,
+2918152
+],
+"waived": false
+},
+{
+"name": "Kobe Johnson",
+"salary": [],
+"waived": false
+},
+{
+"name": "Jalen Wilson",
+"salary": [],
+"waived": false
+},
+{
+"name": "Isaac McKneely",
+"salary": [],
+"waived": false
+},
+{
+"name": "Cameron Corhen",
+"salary": [],
+"waived": false
+},
+{
+"name": "Devin Carter",
+"salary": [
+5158080
+],
+"waived": true
+}
+],
+"BOS": [
+{
+"name": "Jayson Tatum",
+"salary": [
+58456566,
+62786682,
+67116798,
+71446914
+],
+"waived": false
+},
+{
+"name": "Paul George",
+"salary": [
+54126380,
+56586670
+],
+"waived": false
+},
+{
+"name": "Derrick White",
+"salary": [
+30348000,
+32596000,
+34844000
+],
+"waived": false
+},
+{
+"name": "Mitchell Robinson",
+"salary": [
+15044000,
+15796200,
+16548400
+],
+"waived": false
+},
+{
+"name": "Sam Hauser",
+"salary": [
+10848215,
+11651785,
+12455356
+],
+"waived": false
+},
+{
+"name": "Payton Pritchard",
+"salary": [
+7767857,
+8303571
+],
+"waived": false
+},
+{
+"name": "Ron Harper Jr.",
+"salary": [
+3150752,
+3308290,
+3465828,
+3779359
+],
+"waived": false
+},
+{
+"name": "Chris Cenac Jr.",
+"salary": [
+2988120,
+3137640,
+3287400,
+5930470
+],
+"waived": false
+},
+{
+"name": "Hugo González",
+"salary": [
+2923560,
+3062640,
+5528065
+],
+"waived": false
+},
+{
+"name": "Luka Garza",
+"salary": [
+2801346
+],
+"waived": false
+},
+{
+"name": "Baylor Scheierman",
+"salary": [
+2744040,
+4952993
+],
+"waived": false
+},
+{
+"name": "Neemias Queta",
+"salary": [
+2667944,
+12500000,
+13500000,
+14500000,
+15500000
+],
+"waived": false
+},
+{
+"name": "Devin Carter",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Mike Conley",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Jordan Walsh",
+"salary": [
+2406205,
+4629630,
+5000000,
+5370370
+],
+"waived": false
+},
+{
+"name": "Tucker DeVries",
+"salary": [
+1357763
+],
+"waived": false
+},
+{
+"name": "Milos Uzan",
+"salary": [
+1357763
+],
+"waived": false
+},
+{
+"name": "Amari Williams",
+"salary": [],
+"waived": false
+},
+{
+"name": "Dillon Mitchell",
+"salary": [],
+"waived": false
+},
+{
+"name": "Gabe McGlothan",
+"salary": [],
+"waived": false
+},
+{
+"name": "Hayden Gray",
+"salary": [],
+"waived": false
+}
+],
+"BKN": [
+{
+"name": "Michael Porter Jr.",
+"salary": [
+40806150
+],
+"waived": false
+},
+{
+"name": "Julius Randle",
+"salary": [
+33333334,
+35802468
+],
+"waived": false
+},
+{
+"name": "Terance Mann",
+"salary": [
+15500000,
+16000000
+],
+"waived": false
+},
+{
+"name": "Day'Ron Sharpe",
+"salary": [
+10000000,
+10000000
+],
+"waived": false
+},
+{
+"name": "Moritz Wagner",
+"salary": [
+9268293,
+9731707
+],
+"waived": false
+},
+{
+"name": "Mikel Brown Jr.",
+"salary": [
+8787000,
+9226440,
+9666000,
+12256488
+],
+"waived": false
+},
+{
+"name": "Keon Ellis",
+"salary": [
+8780488,
+9219512
+],
+"waived": false
+},
+{
+"name": "Egor Dëmin",
+"salary": [
+7233720,
+7578240,
+9639522
+],
+"waived": false
+},
+{
+"name": "Noah Clowney",
+"salary": [
+5414034
+],
+"waived": false
+},
+{
+"name": "Josh Minott",
+"salary": [
+4500000,
+4500000
+],
+"waived": false
+},
+{
+"name": "Nolan Traoré",
+"salary": [
+4002000,
+4193040,
+6457282
+],
+"waived": false
+},
+{
+"name": "Drake Powell",
+"salary": [
+3540600,
+3709320,
+6101832
+],
+"waived": false
+},
+{
+"name": "Ben Saraf",
+"salary": [
+3028560,
+3172920,
+5720776
+],
+"waived": false
+},
+{
+"name": "Joshua Jefferson",
+"salary": [
+2969520,
+3118560,
+3266880,
+5896718
+],
+"waived": false
+},
+{
+"name": "Danny Wolf",
+"salary": [
+2941440,
+3081840,
+5559640
+],
+"waived": false
+},
+{
+"name": "Grant Nelson",
+"salary": [],
+"waived": false
+},
+{
+"name": "Tyler Bilodeau",
+"salary": [],
+"waived": false
+},
+{
+"name": "Ben Humrichous",
+"salary": [],
+"waived": false
+},
+{
+"name": "Dain Dainja",
+"salary": [],
+"waived": false
+}
+],
+"CHA": [
+{
+"name": "Naz Reid",
+"salary": [
+23275862,
+25000000,
+26724138,
+28448276
+],
+"waived": false
+},
+{
+"name": "Coby White",
+"salary": [
+22839506,
+24666667,
+26493827
+],
+"waived": false
+},
+{
+"name": "Grayson Allen",
+"salary": [
+18125000,
+19375000
+],
+"waived": false
+},
+{
+"name": "Brandon Miller",
+"salary": [
+15104626
+],
+"waived": false
+},
+{
+"name": "Dennis Schröder",
+"salary": [
+14809200,
+15514400
+],
+"waived": false
+},
+{
+"name": "Grant Williams",
+"salary": [
+14265750
+],
+"waived": false
+},
+{
+"name": "Royce O'Neale",
+"salary": [
+10875000,
+11625000
+],
+"waived": false
+},
+{
+"name": "Kon Knueppel",
+"salary": [
+10516560,
+11017560,
+13937214
+],
+"waived": false
+},
+{
+"name": "Tidjane Salaün",
+"salary": [
+8237880,
+10445633
+],
+"waived": false
+},
+{
+"name": "Hannes Steinbach",
+"salary": [
+5227200,
+5488560,
+5750160,
+8515987
+],
+"waived": false
+},
+{
+"name": "Christian Anderson Jr.",
+"salary": [
+4257480,
+4470000,
+4683120,
+7202639
+],
+"waived": false
+},
+{
+"name": "Pat Connaughton",
+"salary": [
+3815861
+],
+"waived": false
+},
+{
+"name": "Liam McNeeley",
+"salary": [
+2902080,
+3040320,
+5487778
+],
+"waived": false
+},
+{
+"name": "Moussa Diabaté",
+"salary": [
+2461462
+],
+"waived": false
+},
+{
+"name": "Sion James",
+"salary": [
+2411090,
+2525901,
+2735698
+],
+"waived": false
+},
+{
+"name": "Ryan Kalkbrenner",
+"salary": [
+2411090,
+2525901,
+2735698
+],
+"waived": false
+},
+{
+"name": "Wyatt Fricks",
+"salary": [],
+"waived": false
+},
+{
+"name": "Jarkel Joiner",
+"salary": [],
+"waived": false
+},
+{
+"name": "Kylan Boswell",
+"salary": [],
+"waived": false
+},
+{
+"name": "Michael Ajayi",
+"salary": [],
+"waived": false
+},
+{
+"name": "Rob Dillingham",
+"salary": [
+6889320
+],
+"waived": true
+},
+{
+"name": "Ryan Nembhard",
+"salary": [
+2150917
+],
+"waived": true
+}
+],
+"CHI": [
+{
+"name": "Josh Giddey",
+"salary": [
+25000000,
+25000000,
+25000000
+],
+"waived": false
+},
+{
+"name": "Nic Claxton",
+"salary": [
+23147727,
+20943184
+],
+"waived": false
+},
+{
+"name": "Norman Powell",
+"salary": [
+21500000,
+22575000
+],
+"waived": false
+},
+{
+"name": "Patrick Williams",
+"salary": [
+18000000,
+18000000,
+18000000
+],
+"waived": false
+},
+{
+"name": "Isaac Okoro",
+"salary": [
+11814814
+],
+"waived": false
+},
+{
+"name": "Caleb Wilson",
+"salary": [
+10683720,
+11217960,
+11752320,
+14866685
+],
+"waived": false
+},
+{
+"name": "Buddy Hield",
+"salary": [
+9658536,
+10097560
+],
+"waived": false
+},
+{
+"name": "Jalen Smith",
+"salary": [
+9428571
+],
+"waived": false
+},
+{
+"name": "Zach Collins",
+"salary": [
+8292683,
+8707317
+],
+"waived": false
+},
+{
+"name": "Tre Jones",
+"salary": [
+8000000,
+8000000
+],
+"waived": false
+},
+{
+"name": "Matas Buzelis",
+"salary": [
+5715360,
+7584283
+],
+"waived": false
+},
+{
+"name": "Noa Essengue",
+"salary": [
+5701200,
+5972760,
+8230464
+],
+"waived": false
+},
+{
+"name": "Dailyn Swain",
+"salary": [
+4965480,
+5213760,
+5461920,
+8373124
+],
+"waived": false
+},
+{
+"name": "Leonard Miller",
+"salary": [
+2406205
+],
+"waived": false
+},
+{
+"name": "Tobe Awaka",
+"salary": [],
+"waived": false
+},
+{
+"name": "Jordan Hawkins",
+"salary": [],
+"waived": false
+},
+{
+"name": "Drew Peterson",
+"salary": [],
+"waived": false
+},
+{
+"name": "Orlando Robinson",
+"salary": [],
+"waived": false
+},
+{
+"name": "Jaylin Sellers",
+"salary": [],
+"waived": false
+},
+{
+"name": "Jalen Bridges",
+"salary": [],
+"waived": false
+},
+{
+"name": "Brandon Boston Jr.",
+"salary": [],
+"waived": false
+}
+],
+"CLE": [
+{
+"name": "Evan Mobley",
+"salary": [
+50105628,
+53817156,
+57528684,
+61240212
+],
+"waived": false
+},
+{
+"name": "Donovan Mitchell",
+"salary": [
+50105628,
+60911900,
+65784852,
+70657804,
+75530756
+],
+"waived": false
+},
+{
+"name": "James Harden",
+"salary": [
+30647619,
+32180000,
+33712381
+],
+"waived": false
+},
+{
+"name": "Jarrett Allen",
+"salary": [
+28000000,
+30240000,
+32480000
+],
+"waived": false
+},
+{
+"name": "Peyton Watson",
+"salary": [
+20465116,
+21488372,
+22511628,
+23534884
+],
+"waived": false
+},
+{
+"name": "Sam Merrill",
+"salary": [
+9160715,
+9839285,
+10517856
+],
+"waived": false
+},
+{
+"name": "Jaylon Tyson",
+"salary": [
+3658560,
+5641500
+],
+"waived": false
+},
+{
+"name": "Thomas Bryant",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Mario Hezonja",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Nae'Qwan Tomlin",
+"salary": [
+2411090
+],
+"waived": false
+},
+{
+"name": "Craig Porter Jr.",
+"salary": [
+2406205
+],
+"waived": false
+},
+{
+"name": "Tyrese Proctor",
+"salary": [
+2150917,
+2525901,
+2735698
+],
+"waived": false
+},
+{
+"name": "Khalifa Diop",
+"salary": [
+1357763,
+2294370,
+2694363,
+2918152
+],
+"waived": false
+},
+{
+"name": "Meleek Thomas",
+"salary": [
+1357763,
+2294370,
+2694363,
+2918152
+],
+"waived": false
+},
+{
+"name": "Kadary Richmond",
+"salary": [],
+"waived": false
+},
+{
+"name": "Rashaun Agee",
+"salary": [],
+"waived": false
+},
+{
+"name": "Zack Austin",
+"salary": [],
+"waived": false
+},
+{
+"name": "Ernest Udeh Jr.",
+"salary": [],
+"waived": false
+},
+{
+"name": "Curtis Jones",
+"salary": [],
+"waived": false
+},
+{
+"name": "Cam Whitmore",
+"salary": [
+1819437,
+1819437,
+1819437
+],
+"waived": true
+},
+{
+"name": "Ricky Rubio",
+"salary": [
+424672
+],
+"waived": true
+}
+],
+"DAL": [
+{
+"name": "Kyrie Irving",
+"salary": [
+39491282,
+42416562
+],
+"waived": false
+},
+{
+"name": "P.J. Washington",
+"salary": [
+19813044,
+21398088,
+22983132,
+24568176
+],
+"waived": false
+},
+{
+"name": "Daniel Gafford",
+"salary": [
+17263584,
+18126763,
+18989942
+],
+"waived": false
+},
+{
+"name": "Santi Aldama",
+"salary": [
+17007043,
+17007043
+],
+"waived": false
+},
+{
+"name": "Cooper Flagg",
+"salary": [
+14517480,
+15208680,
+19178146
+],
+"waived": false
+},
+{
+"name": "Zaccharie Risacher",
+"salary": [
+13826040,
+17434637
+],
+"waived": false
+},
+{
+"name": "Caleb Martin",
+"salary": [
+10001493,
+9371351
+],
+"waived": false
+},
+{
+"name": "Naji Marshall",
+"salary": [
+9428571,
+18195600,
+17285820,
+16376040
+],
+"waived": false
+},
+{
+"name": "Max Christie",
+"salary": [
+8285714,
+8857143
+],
+"waived": false
+},
+{
+"name": "Dereck Lively II",
+"salary": [
+7239131
+],
+"waived": false
+},
+{
+"name": "Morez Johnson Jr.",
+"salary": [
+6754800,
+7093080,
+7430640,
+9466636
+],
+"waived": false
+},
+{
+"name": "Marcus Sasser",
+"salary": [
+5198983
+],
+"waived": false
+},
+{
+"name": "Sergio de Larrea",
+"salary": [
+3182280,
+3341280,
+3500880,
+6305086
+],
+"waived": false
+},
+{
+"name": "Tarik Biberovic",
+"salary": [
+3000000,
+3000000
+],
+"waived": false
+},
+{
+"name": "Moussa Cisse",
+"salary": [
+2185116,
+2571895
+],
+"waived": false
+},
+{
+"name": "Tobi Lawal",
+"salary": [],
+"waived": false
+},
+{
+"name": "Seth Lundy",
+"salary": [],
+"waived": false
+},
+{
+"name": "Jett Howard",
+"salary": [],
+"waived": false
+},
+{
+"name": "Dwight Powell",
+"salary": [],
+"waived": false
+},
+{
+"name": "Klay Thompson",
+"salary": [
+17460317
+],
+"waived": true
+},
+{
+"name": "JaVale McGee",
+"salary": [
+2208856,
+2208856
+],
+"waived": true
+},
+{
+"name": "Olivier-Maxence Prosper",
+"salary": [
+1002360,
+1002360
+],
+"waived": true
+}
+],
+"DEN": [
+{
+"name": "Nikola Jokić",
+"salary": [
+59033114,
+62841702
+],
+"waived": false
+},
+{
+"name": "Jamal Murray",
+"salary": [
+50105628,
+53817156,
+57528684
+],
+"waived": false
+},
+{
+"name": "Aaron Gordon",
+"salary": [
+33658037,
+36350680,
+39043323
+],
+"waived": false
+},
+{
+"name": "Cameron Johnson",
+"salary": [
+23062500
+],
+"waived": false
+},
+{
+"name": "Christian Braun",
+"salary": [
+21551726,
+23275863,
+25000000,
+26724137,
+28448274
+],
+"waived": false
+},
+{
+"name": "Zeke Nnaji",
+"salary": [
+7466667,
+7466667
+],
+"waived": false
+},
+{
+"name": "Spencer Jones",
+"salary": [
+6000000,
+5750000
+],
+"waived": false
+},
+{
+"name": "Julian Strawther",
+"salary": [
+4826931
+],
+"waived": false
+},
+{
+"name": "DaRon Holmes",
+"salary": [
+3372120,
+5547138
+],
+"waived": false
+},
+{
+"name": "Lonnie Walker IV",
+"salary": [
+3286399
+],
+"waived": false
+},
+{
+"name": "DeMar DeRozan",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Tyus Jones",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Marvin Bagley III",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Trevon Brazile",
+"salary": [
+1357763
+],
+"waived": false
+},
+{
+"name": "Dane Goodwin",
+"salary": [],
+"waived": false
+},
+{
+"name": "Coleman Hawkins",
+"salary": [],
+"waived": false
+},
+{
+"name": "Bryce Hopkins",
+"salary": [],
+"waived": false
+},
+{
+"name": "Emanuel Miller",
+"salary": [],
+"waived": false
+},
+{
+"name": "Ryan Nembhard",
+"salary": [],
+"waived": false
+},
+{
+"name": "Cam Whitmore",
+"salary": [],
+"waived": false
+}
+],
+"DET": [
+{
+"name": "Cade Cunningham",
+"salary": [
+50105628,
+53817156,
+57528684,
+61240212
+],
+"waived": false
+},
+{
+"name": "Jalen Duren",
+"salary": [
+40160643,
+36947792,
+38955824,
+40963856,
+42971885
+],
+"waived": false
+},
+{
+"name": "John Collins",
+"salary": [
+17000000,
+17000000,
+17000000
+],
+"waived": false
+},
+{
+"name": "Duncan Robinson",
+"salary": [
+15992957,
+15151222
+],
+"waived": false
+},
+{
+"name": "Isaiah Joe",
+"salary": [
+11323006,
+11323006
+],
+"waived": false
+},
+{
+"name": "Ausar Thompson",
+"salary": [
+11117925,
+26724138,
+28862069,
+31000000,
+33137931
+],
+"waived": false
+},
+{
+"name": "Ron Holland",
+"salary": [
+9069600,
+11491183
+],
+"waived": false
+},
+{
+"name": "Kevin Huerter",
+"salary": [
+8333333,
+9000000,
+9666667
+],
+"waived": false
+},
+{
+"name": "Paul Reed",
+"salary": [
+5602689
+],
+"waived": false
+},
+{
+"name": "Ebuka Okorie",
+"salary": [
+4481280,
+4705440,
+4929360,
+7571497
+],
+"waived": false
+},
+{
+"name": "Daniss Jenkins",
+"salary": [
+4000000
+],
+"waived": false
+},
+{
+"name": "Javonte Green",
+"salary": [
+3943679
+],
+"waived": false
+},
+{
+"name": "Taurean Prince",
+"salary": [
+3815861
+],
+"waived": false
+},
+{
+"name": "Tolu Smith",
+"salary": [
+2411090
+],
+"waived": false
+},
+{
+"name": "Chaz Lanier",
+"salary": [
+2150917,
+2525901,
+2735698
+],
+"waived": false
+},
+{
+"name": "Ugonna Onyenso",
+"salary": [],
+"waived": false
+},
+{
+"name": "Elijah Harkless",
+"salary": [],
+"waived": false
+},
+{
+"name": "John Ukomadu",
+"salary": [],
+"waived": false
+},
+{
+"name": "Brice Williams",
+"salary": [],
+"waived": false
+},
+{
+"name": "Gary Harris",
+"salary": [
+3815861
+],
+"waived": true
+}
+],
+"GSW": [
+{
+"name": "Stephen Curry",
+"salary": [
+62587158,
+55700000,
+60156000
+],
+"waived": false
+},
+{
+"name": "Jimmy Butler",
+"salary": [
+56832773
+],
+"waived": false
+},
+{
+"name": "Draymond Green",
+"salary": [
+27678571
+],
+"waived": false
+},
+{
+"name": "Kristaps Porziņģis",
+"salary": [
+19512195,
+20487805
+],
+"waived": false
+},
+{
+"name": "Moses Moody",
+"salary": [
+12500000,
+13425925
+],
+"waived": false
+},
+{
+"name": "Al Horford",
+"salary": [
+6822000,
+7163100
+],
+"waived": false
+},
+{
+"name": "Yaxel Lendeborg",
+"salary": [
+6096240,
+6401280,
+6706200,
+8899128
+],
+"waived": false
+},
+{
+"name": "Brandin Podziemski",
+"salary": [
+5679459
+],
+"waived": false
+},
+{
+"name": "De'Anthony Melton",
+"salary": [
+5477000,
+5750850
+],
+"waived": false
+},
+{
+"name": "Gui Santos",
+"salary": [
+4629630,
+5000000,
+5370370
+],
+"waived": false
+},
+{
+"name": "Charles Bassey",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Georges Niang",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Gary Payton II",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Brandon Williams",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Alex Toohey",
+"salary": [
+2185116
+],
+"waived": false
+},
+{
+"name": "Will Richard",
+"salary": [
+2150917,
+2525901,
+2735698
+],
+"waived": false
+},
+{
+"name": "Dalen Terry",
+"salary": [
+1357763
+],
+"waived": false
+},
+{
+"name": "Graham Ike",
+"salary": [],
+"waived": false
+},
+{
+"name": "Miles Kelly",
+"salary": [],
+"waived": false
+}
+],
+"HOU": [
+{
+"name": "Kevin Durant",
+"salary": [
+43902439,
+46097561
+],
+"waived": false
+},
+{
+"name": "Alperen Şengün",
+"salary": [
+35642202,
+37339450,
+39036697,
+39036697
+],
+"waived": false
+},
+{
+"name": "Fred VanVleet",
+"salary": [
+25000000
+],
+"waived": false
+},
+{
+"name": "Jabari Smith Jr.",
+"salary": [
+23643411,
+21751940,
+23643411,
+25534883,
+27426355
+],
+"waived": false
+},
+{
+"name": "Tari Eason",
+"salary": [
+14051724,
+15175862,
+16300000,
+17424138,
+18548276
+],
+"waived": false
+},
+{
+"name": "Steven Adams",
+"salary": [
+13000000,
+11869566
+],
+"waived": false
+},
+{
+"name": "Amen Thompson",
+"salary": [
+12258609,
+35862069,
+38731034,
+41600000,
+44468966
+],
+"waived": false
+},
+{
+"name": "Reed Sheppard",
+"salary": [
+11108880,
+14041625
+],
+"waived": false
+},
+{
+"name": "Clint Capela",
+"salary": [
+7035000,
+7370000
+],
+"waived": false
+},
+{
+"name": "Marcus Smart",
+"salary": [
+6064000,
+6367200
+],
+"waived": false
+},
+{
+"name": "Julian Phillips",
+"salary": [
+2537526
+],
+"waived": false
+},
+{
+"name": "Oscar Tshiebwe",
+"salary": [
+2537526
+],
+"waived": false
+},
+{
+"name": "Isaiah Crawford",
+"salary": [
+2449421,
+2664401
+],
+"waived": false
+},
+{
+"name": "Bogdan Bogdanović",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Jae'Sean Tate",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Bruce Thornton",
+"salary": [
+1357763,
+2294370,
+2694363,
+2918152
+],
+"waived": false
+},
+{
+"name": "Quadir Copeland",
+"salary": [],
+"waived": false
+},
+{
+"name": "Sean Pedulla",
+"salary": [],
+"waived": false
+}
+],
+"IND": [
+{
+"name": "Tyrese Haliburton",
+"salary": [
+48924624,
+52298736,
+55672848
+],
+"waived": false
+},
+{
+"name": "Pascal Siakam",
+"salary": [
+48924624,
+52298736
+],
+"waived": false
+},
+{
+"name": "Ivica Zubac",
+"salary": [
+20342140,
+21790300
+],
+"waived": false
+},
+{
+"name": "Andrew Nembhard",
+"salary": [
+19550160,
+20998320
+],
+"waived": false
+},
+{
+"name": "Obi Toppin",
+"salary": [
+15000000,
+16025000
+],
+"waived": false
+},
+{
+"name": "T.J. McConnell",
+"salary": [
+11000000,
+11800000,
+11800000
+],
+"waived": false
+},
+{
+"name": "Aaron Nesmith",
+"salary": [
+11000000,
+19418000,
+20971440
+],
+"waived": false
+},
+{
+"name": "Jarace Walker",
+"salary": [
+8478542
+],
+"waived": false
+},
+{
+"name": "Kelly Oubre Jr.",
+"salary": [
+8050000,
+8450000
+],
+"waived": false
+},
+{
+"name": "Ben Sheppard",
+"salary": [
+5031669
+],
+"waived": false
+},
+{
+"name": "Jay Huff",
+"salary": [
+2667944,
+3005085
+],
+"waived": false
+},
+{
+"name": "Larry Nance Jr.",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Johnny Furphy",
+"salary": [
+2296271,
+2486995
+],
+"waived": false
+},
+{
+"name": "Keba Keita",
+"salary": [
+1357763
+],
+"waived": false
+},
+{
+"name": "Rienk Mast",
+"salary": [
+1357763
+],
+"waived": false
+},
+{
+"name": "Quenton Jackson",
+"salary": [],
+"waived": false
+},
+{
+"name": "James Johnson",
+"salary": [],
+"waived": false
+},
+{
+"name": "Kobe Brown",
+"salary": [],
+"waived": false
+},
+{
+"name": "Jalen Slawson",
+"salary": [],
+"waived": false
+},
+{
+"name": "Braden Smith",
+"salary": [],
+"waived": false
+}
+],
+"LAC": [
+{
+"name": "Darius Garland",
+"salary": [
+42166510,
+44886930
+],
+"waived": false
+},
+{
+"name": "Brandon Ingram",
+"salary": [
+40000000,
+41904762
+],
+"waived": false
+},
+{
+"name": "Max Strus",
+"salary": [
+16660836
+],
+"waived": false
+},
+{
+"name": "Rui Hachimura",
+"salary": [
+14000000,
+14000000
+],
+"waived": false
+},
+{
+"name": "Derrick Jones Jr.",
+"salary": [
+10476190
+],
+"waived": false
+},
+{
+"name": "Keaton Wagler",
+"salary": [
+9674760,
+10158240,
+10641960,
+13483364
+],
+"waived": false
+},
+{
+"name": "Brook Lopez",
+"salary": [
+9187500
+],
+"waived": false
+},
+{
+"name": "Gradey Dick",
+"salary": [
+7131511
+],
+"waived": false
+},
+{
+"name": "Isaiah Jackson",
+"salary": [
+7000000,
+6400000
+],
+"waived": false
+},
+{
+"name": "Bradley Beal",
+"salary": [
+6424800,
+6746040
+],
+"waived": false
+},
+{
+"name": "Nicolas Batum",
+"salary": [
+5881680
+],
+"waived": false
+},
+{
+"name": "Kris Dunn",
+"salary": [
+5684800
+],
+"waived": false
+},
+{
+"name": "Jordan Miller",
+"salary": [
+5300000,
+5000000,
+5000000
+],
+"waived": false
+},
+{
+"name": "Yanic Konan Niederhäuser",
+"salary": [
+2880960,
+3018480,
+5448356
+],
+"waived": false
+},
+{
+"name": "Kobe Sanders",
+"salary": [
+2622139,
+2753246,
+2884353,
+3019474
+],
+"waived": false
+},
+{
+"name": "Yuki Kawamura",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Cam Christie",
+"salary": [
+2296271,
+2486995
+],
+"waived": false
+},
+{
+"name": "Baba Miller",
+"salary": [
+1705630,
+2294370,
+2694363,
+2918152
+],
+"waived": false
+},
+{
+"name": "Jalen Pickett",
+"salary": [],
+"waived": false
+},
+{
+"name": "Nick Martinelli",
+"salary": [],
+"waived": false
+},
+{
+"name": "Blake Wesley",
+"salary": [],
+"waived": false
+},
+{
+"name": "Johni Broome",
+"salary": [
+2150917
+],
+"waived": true
+}
+],
+"LAL": [
+{
+"name": "Luka Dončić",
+"salary": [
+49800000,
+53784000,
+57768000
+],
+"waived": false
+},
+{
+"name": "Austin Reaves",
+"salary": [
+41240250,
+44539470,
+47838690,
+51137910
+],
+"waived": false
+},
+{
+"name": "Walker Kessler",
+"salary": [
+30232558,
+31744186,
+33255814,
+34767442
+],
+"waived": false
+},
+{
+"name": "Quentin Grimes",
+"salary": [
+13953489,
+14651163,
+15348837,
+16046511
+],
+"waived": false
+},
+{
+"name": "Sandro Mamukelashvili",
+"salary": [
+13000000,
+12350000,
+13000000,
+13650000
+],
+"waived": false
+},
+{
+"name": "Jarred Vanderbilt",
+"salary": [
+12428571,
+13285714
+],
+"waived": false
+},
+{
+"name": "Collin Sexton",
+"salary": [
+9366000,
+9834300
+],
+"waived": false
+},
+{
+"name": "Jake LaRavia",
+"salary": [
+6000000
+],
+"waived": false
+},
+{
+"name": "Jaden Hardy",
+"salary": [
+6000000,
+6000000
+],
+"waived": false
+},
+{
+"name": "Dalton Knecht",
+"salary": [
+4201080,
+6452860
+],
+"waived": false
+},
+{
+"name": "Cameron Carr",
+"salary": [
+3315360,
+3481080,
+3646800,
+6378253
+],
+"waived": false
+},
+{
+"name": "Ziaire Williams",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Kevon Looney",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Matisse Thybulle",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Bronny James",
+"salary": [
+2296271,
+2486995
+],
+"waived": false
+},
+{
+"name": "Adou Thiero",
+"salary": [
+2150917,
+2525901
+],
+"waived": false
+},
+{
+"name": "AK Okereke",
+"salary": [],
+"waived": false
+},
+{
+"name": "Nick Smith Jr.",
+"salary": [],
+"waived": false
+},
+{
+"name": "Cole Swider",
+"salary": [],
+"waived": false
+},
+{
+"name": "Chris Mañon",
+"salary": [],
+"waived": false
+},
+{
+"name": "William Kyle III",
+"salary": [],
+"waived": false
+},
+{
+"name": "Arthur Kaluma",
+"salary": [],
+"waived": false
+}
+],
+"MEM": [
+{
+"name": "Jerami Grant",
+"salary": [
+34206898,
+36413790
+],
+"waived": false
+},
+{
+"name": "Isaiah Stewart",
+"salary": [
+15000000,
+15000000
+],
+"waived": false
+},
+{
+"name": "Cameron Boozer",
+"salary": [
+11849760,
+12441840,
+13034880,
+16476089
+],
+"waived": false
+},
+{
+"name": "Ty Jerome",
+"salary": [
+9220050,
+9659100
+],
+"waived": false
+},
+{
+"name": "Quinten Post",
+"salary": [
+8285714,
+8700000,
+9114286
+],
+"waived": false
+},
+{
+"name": "Taylor Hendricks",
+"salary": [
+7805900
+],
+"waived": false
+},
+{
+"name": "Zach Edey",
+"salary": [
+6332760,
+8067937
+],
+"waived": false
+},
+{
+"name": "Cedric Coward",
+"salary": [
+6001080,
+6286920,
+8342743
+],
+"waived": false
+},
+{
+"name": "Kris Murray",
+"salary": [
+5315004
+],
+"waived": false
+},
+{
+"name": "Walter Clayton",
+"salary": [
+4190520,
+4390320,
+6752312
+],
+"waived": false
+},
+{
+"name": "Karim López",
+"salary": [
+3746760,
+3934320,
+4121760,
+6565964
+],
+"waived": false
+},
+{
+"name": "Olivier-Maxence Prosper",
+"salary": [
+2497812
+],
+"waived": false
+},
+{
+"name": "Scotty Pippen Jr.",
+"salary": [
+2461462,
+2789215
+],
+"waived": false
+},
+{
+"name": "Cam Spencer",
+"salary": [
+2411090,
+2616754,
+2830685
+],
+"waived": false
+},
+{
+"name": "GG Jackson II",
+"salary": [
+2406205
+],
+"waived": false
+},
+{
+"name": "Jaylen Wells",
+"salary": [
+2296271,
+2486995
+],
+"waived": false
+},
+{
+"name": "Micah Peavy",
+"salary": [
+2150917,
+2525901,
+2735698
+],
+"waived": false
+},
+{
+"name": "Carson Cooper",
+"salary": [],
+"waived": false
+},
+{
+"name": "Kentavious Caldwell-Pope",
+"salary": [
+17744971
+],
+"waived": true
+},
+{
+"name": "Jordan Hawkins",
+"salary": [
+7021895
+],
+"waived": true
+},
+{
+"name": "D'Angelo Russell",
+"salary": [
+5969250
+],
+"waived": true
+},
+{
+"name": "Cole Anthony",
+"salary": [
+3700000,
+3700000
+],
+"waived": true
+},
+{
+"name": "Mamadi Diakite",
+"salary": [
+464050
+],
+"waived": true
+}
+],
+"MIA": [
+{
+"name": "Giannis Antetokounmpo",
+"salary": [
+58456566,
+62786682
+],
+"waived": false
+},
+{
+"name": "Bam Adebayo",
+"salary": [
+49800000,
+53784000,
+57768000
+],
+"waived": false
+},
+{
+"name": "Andrew Wiggins",
+"salary": [
+30169644,
+16346154,
+17653846
+],
+"waived": false
+},
+{
+"name": "Nikola Jović",
+"salary": [
+16200000,
+14904000,
+15096000,
+16200000
+],
+"waived": false
+},
+{
+"name": "Bobby Portis",
+"salary": [
+14521414,
+15597074
+],
+"waived": false
+},
+{
+"name": "Davion Mitchell",
+"salary": [
+12400000
+],
+"waived": false
+},
+{
+"name": "Tim Hardaway Jr.",
+"salary": [
+6500000
+],
+"waived": false
+},
+{
+"name": "Klay Thompson",
+"salary": [
+5600000,
+5880000
+],
+"waived": false
+},
+{
+"name": "Dru Smith",
+"salary": [
+2584539,
+2934742
+],
+"waived": false
+},
+{
+"name": "Simone Fontecchio",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Nick Richards",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Pelle Larsson",
+"salary": [
+2296271,
+13392857,
+14464286,
+15535714,
+16607143
+],
+"waived": false
+},
+{
+"name": "Bez Mbeng",
+"salary": [
+2185116
+],
+"waived": false
+},
+{
+"name": "Myron Gardner",
+"salary": [
+2150917,
+2525901
+],
+"waived": false
+},
+{
+"name": "J'Vonne Hadley",
+"salary": [
+1357763
+],
+"waived": false
+},
+{
+"name": "Ryan Conwell",
+"salary": [
+1357763,
+2294370,
+2694363
+],
+"waived": false
+},
+{
+"name": "Keshad Johnson",
+"salary": [],
+"waived": false
+},
+{
+"name": "Lester Quiñones",
+"salary": [],
+"waived": false
+},
+{
+"name": "Vladislav Goldin",
+"salary": [],
+"waived": false
+},
+{
+"name": "Ian Schieffelin",
+"salary": [],
+"waived": false
+},
+{
+"name": "Tre Donaldson",
+"salary": [],
+"waived": false
+},
+{
+"name": "Jahmir Young",
+"salary": [],
+"waived": false
+}
+],
+"MIL": [
+{
+"name": "Tyler Herro",
+"salary": [
+33000000
+],
+"waived": false
+},
+{
+"name": "Myles Turner",
+"salary": [
+26584164,
+27850077,
+29115990
+],
+"waived": false
+},
+{
+"name": "Kyle Kuzma",
+"salary": [
+20345152
+],
+"waived": false
+},
+{
+"name": "Gary Trent Jr.",
+"salary": [
+15200000,
+16400000,
+16400000,
+16000000
+],
+"waived": false
+},
+{
+"name": "Caris LeVert",
+"salary": [
+14809200
+],
+"waived": false
+},
+{
+"name": "A.J. Green",
+"salary": [
+10044644,
+10848215,
+11651786,
+12455355
+],
+"waived": false
+},
+{
+"name": "Brayden Burries",
+"salary": [
+6417360,
+6738000,
+7058520,
+8999614
+],
+"waived": false
+},
+{
+"name": "Jaime Jaquez Jr.",
+"salary": [
+5939141
+],
+"waived": false
+},
+{
+"name": "Ousmane Dieng",
+"salary": [
+5750000,
+5750000,
+5750000
+],
+"waived": false
+},
+{
+"name": "Nate Ament",
+"salary": [
+5502000,
+5777280,
+6052200,
+8648594
+],
+"waived": false
+},
+{
+"name": "Kevin Porter Jr.",
+"salary": [
+5390700
+],
+"waived": false
+},
+{
+"name": "Kel'el Ware",
+"salary": [
+4654920,
+7135992
+],
+"waived": false
+},
+{
+"name": "Ryan Rollins",
+"salary": [
+4000000,
+4000000
+],
+"waived": false
+},
+{
+"name": "Kasparas Jakučionis",
+"salary": [
+3841680,
+4024440,
+6205687
+],
+"waived": false
+},
+{
+"name": "Jericho Sims",
+"salary": [
+2801346
+],
+"waived": false
+},
+{
+"name": "Pete Nance",
+"salary": [
+2537526,
+2756912
+],
+"waived": false
+},
+{
+"name": "Bogoljub Markovic",
+"salary": [
+1357763,
+2294370,
+2694363,
+2918152
+],
+"waived": false
+},
+{
+"name": "Johni Broome",
+"salary": [],
+"waived": false
+},
+{
+"name": "Jake Stephens",
+"salary": [],
+"waived": false
+},
+{
+"name": "Kam Jones",
+"salary": [],
+"waived": false
+},
+{
+"name": "Damian Lillard",
+"salary": [
+22516603,
+22516603,
+22516603,
+22516603
+],
+"waived": true
+},
+{
+"name": "Vasilije Micić",
+"salary": [
+666667,
+666667
+],
+"waived": true
+}
+],
+"MIN": [
+{
+"name": "Anthony Edwards",
+"salary": [
+48924624,
+52298736,
+55672848
+],
+"waived": false
+},
+{
+"name": "LaMelo Ball",
+"salary": [
+40770520,
+43582280,
+46394040
+],
+"waived": false
+},
+{
+"name": "Rudy Gobert",
+"salary": [
+36500000,
+38000000
+],
+"waived": false
+},
+{
+"name": "Jaden McDaniels",
+"salary": [
+26200001,
+28006898,
+29813790
+],
+"waived": false
+},
+{
+"name": "Ayo Dosunmu",
+"salary": [
+19310345,
+20855173,
+22400001,
+23944829,
+25489652
+],
+"waived": false
+},
+{
+"name": "Donte DiVincenzo",
+"salary": [
+12535000
+],
+"waived": false
+},
+{
+"name": "Jonathan Kuminga",
+"salary": [
+6064000,
+6367200
+],
+"waived": false
+},
+{
+"name": "Cody Williams",
+"salary": [
+6015600,
+7669890
+],
+"waived": false
+},
+{
+"name": "Joan Beringer",
+"salary": [
+4411200,
+4621200,
+7098163
+],
+"waived": false
+},
+{
+"name": "Jaylen Clark",
+"salary": [
+3086420,
+3333334,
+3580246
+],
+"waived": false
+},
+{
+"name": "Bones Hyland",
+"salary": [
+2845883
+],
+"waived": false
+},
+{
+"name": "Terrence Shannon Jr.",
+"salary": [
+2801640,
+5054159
+],
+"waived": false
+},
+{
+"name": "Trey Lyles",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Isaiah Evans",
+"salary": [
+1357763,
+2294370,
+2694363,
+2918152
+],
+"waived": false
+},
+{
+"name": "Enrique Freeman",
+"salary": [],
+"waived": false
+},
+{
+"name": "KJ Martin",
+"salary": [],
+"waived": false
+},
+{
+"name": "Norchad Omier",
+"salary": [],
+"waived": false
+},
+{
+"name": "Antonio Reeves",
+"salary": [],
+"waived": false
+},
+{
+"name": "Drew Timme",
+"salary": [],
+"waived": false
+},
+{
+"name": "John Konchar",
+"salary": [
+2055000,
+2055000,
+2055000
+],
+"waived": true
+}
+],
+"NOP": [
+{
+"name": "Zion Williamson",
+"salary": [
+42166510,
+44886930
+],
+"waived": false
+},
+{
+"name": "Jordan Poole",
+"salary": [
+34044642
+],
+"waived": false
+},
+{
+"name": "Dejounte Murray",
+"salary": [
+32785071,
+30751504
+],
+"waived": false
+},
+{
+"name": "Trey Murphy III",
+"salary": [
+27000000,
+29000000,
+31000000
+],
+"waived": false
+},
+{
+"name": "Herbert Jones",
+"salary": [
+14898786,
+20858300,
+22526964,
+24195628
+],
+"waived": false
+},
+{
+"name": "Jeremiah Fears",
+"salary": [
+7896240,
+8271960,
+10505389
+],
+"waived": false
+},
+{
+"name": "Bennedict Mathurin",
+"salary": [
+7804878,
+8195122
+],
+"waived": false
+},
+{
+"name": "Saddiq Bey",
+"salary": [
+6440678,
+17129630,
+18500000,
+19870370
+],
+"waived": false
+},
+{
+"name": "Derik Queen",
+"salary": [
+5416080,
+5673840,
+8107918
+],
+"waived": false
+},
+{
+"name": "DeAndre Jordan",
+"salary": [
+3876529,
+4070355
+],
+"waived": false
+},
+{
+"name": "Yves Missi",
+"salary": [
+3512760,
+5595827
+],
+"waived": false
+},
+{
+"name": "AJ Johnson",
+"salary": [
+3237120,
+5493394
+],
+"waived": false
+},
+{
+"name": "Christian Koloko",
+"salary": [
+2625627
+],
+"waived": false
+},
+{
+"name": "Caleb Houstan",
+"salary": [
+2625627
+],
+"waived": false
+},
+{
+"name": "Bryce McGowens",
+"salary": [
+2584539,
+2934742
+],
+"waived": false
+},
+{
+"name": "Trendon Watford",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Kobe Bufkin",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Karlo Matković",
+"salary": [
+2296271
+],
+"waived": false
+},
+{
+"name": "Jaron Pierre Jr.",
+"salary": [],
+"waived": false
+},
+{
+"name": "Julian Reese",
+"salary": [],
+"waived": false
+},
+{
+"name": "Malik Dia",
+"salary": [],
+"waived": false
+},
+{
+"name": "Taj Gibson",
+"salary": [
+148828
+],
+"waived": true
+}
+],
+"NYK": [
+{
+"name": "Karl-Anthony Towns",
+"salary": [
+57078728,
+61015192
+],
+"waived": false
+},
+{
+"name": "OG Anunoby",
+"salary": [
+42500000,
+45431034,
+48362068
+],
+"waived": false
+},
+{
+"name": "Jalen Brunson",
+"salary": [
+37739521,
+40535041,
+43330561
+],
+"waived": false
+},
+{
+"name": "Mikal Bridges",
+"salary": [
+33482145,
+36160714,
+38839285,
+41517856
+],
+"waived": false
+},
+{
+"name": "Josh Hart",
+"salary": [
+20923760,
+22375280
+],
+"waived": false
+},
+{
+"name": "Landry Shamet",
+"salary": [
+5357143,
+5785714,
+6214286,
+6642857
+],
+"waived": false
+},
+{
+"name": "Jose Alvarado",
+"salary": [
+4500000,
+4860000,
+5220000
+],
+"waived": false
+},
+{
+"name": "Miles McBride",
+"salary": [
+3956523
+],
+"waived": false
+},
+{
+"name": "Pacôme Dadiet",
+"salary": [
+2983680,
+5373608
+],
+"waived": false
+},
+{
+"name": "Jordan Clarkson",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Drew Eubanks",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Andre Drummond",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Ochai Agbaji",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Bruce Brown",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "James Wiseman",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Tyler Kolek",
+"salary": [
+2296271,
+2486995
+],
+"waived": false
+},
+{
+"name": "Mohamed Diawara",
+"salary": [
+2232143,
+2410714,
+2589286,
+2767857
+],
+"waived": false
+},
+{
+"name": "Tyler Nickel",
+"salary": [],
+"waived": false
+},
+{
+"name": "Kevin McCullar Jr.",
+"salary": [],
+"waived": false
+},
+{
+"name": "Tony Bradley",
+"salary": [],
+"waived": false
+},
+{
+"name": "Jaden Akins",
+"salary": [],
+"waived": false
+}
+],
+"OKC": [
+{
+"name": "Jalen Williams",
+"salary": [
+41500000,
+44820000,
+48140000,
+51460000,
+54780000
+],
+"waived": false
+},
+{
+"name": "Chet Holmgren",
+"salary": [
+41500000,
+44820000,
+48140000,
+51460000,
+54780000
+],
+"waived": false
+},
+{
+"name": "Shai Gilgeous-Alexander",
+"salary": [
+40806150,
+61005000,
+65885400,
+70765800,
+75646200
+],
+"waived": false
+},
+{
+"name": "Isaiah Hartenstein",
+"salary": [
+23148148,
+25000000,
+26851852
+],
+"waived": false
+},
+{
+"name": "Alex Caruso",
+"salary": [
+19550160,
+20998320,
+22446480
+],
+"waived": false
+},
+{
+"name": "Jaylin Williams",
+"salary": [
+7774648,
+7774648
+],
+"waived": false
+},
+{
+"name": "Cason Wallace",
+"salary": [
+7420806
+],
+"waived": false
+},
+{
+"name": "Aday Mara",
+"salary": [
+5791680,
+6081480,
+6371160,
+8779459
+],
+"waived": false
+},
+{
+"name": "Nikola Topić",
+"salary": [
+5429760,
+7482210
+],
+"waived": false
+},
+{
+"name": "Kenrich Williams",
+"salary": [
+5000000
+],
+"waived": false
+},
+{
+"name": "Thomas Sorber",
+"salary": [
+4887720,
+5120400,
+7849573
+],
+"waived": false
+},
+{
+"name": "Bennett Stirtz",
+"salary": [
+4717320,
+4953240,
+5189400,
+7960540
+],
+"waived": false
+},
+{
+"name": "Jared McCain",
+"salary": [
+4422600,
+6784268
+],
+"waived": false
+},
+{
+"name": "Ajay Mitchell",
+"salary": [
+2850000,
+2850000
+],
+"waived": false
+},
+{
+"name": "Christoph Tilly",
+"salary": [
+1357763
+],
+"waived": false
+},
+{
+"name": "Otega Oweh",
+"salary": [],
+"waived": false
+},
+{
+"name": "Anthony Pritchard",
+"salary": [],
+"waived": false
+},
+{
+"name": "Zhaire Smith",
+"salary": [],
+"waived": false
+},
+{
+"name": "Andrew Holifield",
+"salary": [],
+"waived": false
+},
+{
+"name": "Josh Dix",
+"salary": [],
+"waived": false
+},
+{
+"name": "Brooks Barnhizer",
+"salary": [],
+"waived": false
+}
+],
+"ORL": [
+{
+"name": "Franz Wagner",
+"salary": [
+41754690,
+44847630,
+47940570,
+51033510
+],
+"waived": false
+},
+{
+"name": "Paolo Banchero",
+"salary": [
+41500000,
+44820000,
+48140000,
+51460000,
+54780000
+],
+"waived": false
+},
+{
+"name": "Desmond Bane",
+"salary": [
+39446090,
+42166510,
+44886930
+],
+"waived": false
+},
+{
+"name": "Jalen Suggs",
+"salary": [
+32400000,
+29600000,
+26800000,
+26700000
+],
+"waived": false
+},
+{
+"name": "Wendell Carter Jr.",
+"salary": [
+18102000,
+19550160,
+20998320
+],
+"waived": false
+},
+{
+"name": "Jonathan Isaac",
+"salary": [
+10449421
+],
+"waived": false
+},
+{
+"name": "Anthony Black",
+"salary": [
+10106316
+],
+"waived": false
+},
+{
+"name": "Goga Bitadze",
+"salary": [
+7608696
+],
+"waived": false
+},
+{
+"name": "Tristan Da Silva",
+"salary": [
+3991200,
+6138466
+],
+"waived": false
+},
+{
+"name": "Jase Richardson",
+"salary": [
+3132360,
+3282000,
+5910882
+],
+"waived": false
+},
+{
+"name": "JD Davison",
+"salary": [
+2625627
+],
+"waived": false
+},
+{
+"name": "Jamal Cain",
+"salary": [
+2584539
+],
+"waived": false
+},
+{
+"name": "Malaki Branham",
+"salary": [
+2537526
+],
+"waived": false
+},
+{
+"name": "Jevon Carter",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Nikola Vučević",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Noah Penda",
+"salary": [
+2150917,
+2525901,
+2735698
+],
+"waived": false
+},
+{
+"name": "Colin Castleton",
+"salary": [],
+"waived": false
+},
+{
+"name": "Kevin Knox",
+"salary": [],
+"waived": false
+},
+{
+"name": "Izaiyah Nelson",
+"salary": [],
+"waived": false
+}
+],
+"PHI": [
+{
+"name": "Joel Embiid",
+"salary": [
+58100000,
+62748000,
+67396000
+],
+"waived": false
+},
+{
+"name": "Jaylen Brown",
+"salary": [
+57078728,
+61015192,
+64951656
+],
+"waived": false
+},
+{
+"name": "Tyrese Maxey",
+"salary": [
+40770520,
+43582280,
+46394040
+],
+"waived": false
+},
+{
+"name": "VJ Edgecombe",
+"salary": [
+11663880,
+12219720,
+15445727
+],
+"waived": false
+},
+{
+"name": "Dean Wade",
+"salary": [
+9000000,
+9450000,
+9900000,
+10350000
+],
+"waived": false
+},
+{
+"name": "Anfernee Simons",
+"salary": [
+6000000,
+6300000
+],
+"waived": false
+},
+{
+"name": "LeBron James",
+"salary": [
+3876529,
+4070355
+],
+"waived": false
+},
+{
+"name": "Labaron Philon Jr.",
+"salary": [
+3597120,
+3776760,
+3956760,
+6508871
+],
+"waived": false
+},
+{
+"name": "Dominick Barlow",
+"salary": [
+3415000
+],
+"waived": false
+},
+{
+"name": "Ariel Hukporti",
+"salary": [
+3400000
+],
+"waived": false
+},
+{
+"name": "Jabari Walker",
+"salary": [
+2584539
+],
+"waived": false
+},
+{
+"name": "Dillon Jones",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Kentavious Caldwell-Pope",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Justin Edwards",
+"salary": [
+2411090,
+2616754
+],
+"waived": false
+},
+{
+"name": "Adem Bona",
+"salary": [
+2296271,
+2486995
+],
+"waived": false
+},
+{
+"name": "Jameer Nelson Jr.",
+"salary": [
+1357763
+],
+"waived": false
+},
+{
+"name": "Tacko Fall",
+"salary": [
+1357763
+],
+"waived": false
+},
+{
+"name": "Saint Thomas",
+"salary": [
+1357763
+],
+"waived": false
+},
+{
+"name": "Caleb Love",
+"salary": [],
+"waived": false
+},
+{
+"name": "Duke Miles",
+"salary": [],
+"waived": false
+},
+{
+"name": "Rayan Rupert",
+"salary": [],
+"waived": false
+}
+],
+"PHX": [
+{
+"name": "Devin Booker",
+"salary": [
+57078728,
+61015192,
+64065952,
+69191228
+],
+"waived": false
+},
+{
+"name": "Jalen Green",
+"salary": [
+36251166,
+36000000
+],
+"waived": false
+},
+{
+"name": "Miles Bridges",
+"salary": [
+22826087
+],
+"waived": false
+},
+{
+"name": "Dillon Brooks",
+"salary": [
+19992727,
+22530864,
+24333333,
+26135802
+],
+"waived": false
+},
+{
+"name": "Mark Williams",
+"salary": [
+11728395,
+12666667,
+13604938
+],
+"waived": false
+},
+{
+"name": "Collin Gillespie",
+"salary": [
+10714286,
+11571429,
+12428571,
+13285714
+],
+"waived": false
+},
+{
+"name": "Khaman Maluach",
+"salary": [
+6316680,
+6617160,
+8436880
+],
+"waived": false
+},
+{
+"name": "Luke Kennard",
+"salary": [
+6064000,
+6367200
+],
+"waived": false
+},
+{
+"name": "Jordan Goodwin",
+"salary": [
+5864198,
+6333333,
+6802469
+],
+"waived": false
+},
+{
+"name": "Haywood Highsmith",
+"salary": [
+3449421
+],
+"waived": false
+},
+{
+"name": "Koa Peat",
+"salary": [
+2926800,
+3073080,
+3219840,
+5811811
+],
+"waived": false
+},
+{
+"name": "Ryan Dunn",
+"salary": [
+2784240,
+5025553
+],
+"waived": false
+},
+{
+"name": "Jamaree Bouyea",
+"salary": [
+2584539
+],
+"waived": false
+},
+{
+"name": "Oso Ighodaro",
+"salary": [
+2296271,
+2486995
+],
+"waived": false
+},
+{
+"name": "Rasheer Fleming",
+"salary": [
+2150917,
+2525901,
+2735698
+],
+"waived": false
+},
+{
+"name": "Kennedy Chandler",
+"salary": [],
+"waived": false
+},
+{
+"name": "Duop Reath",
+"salary": [],
+"waived": false
+},
+{
+"name": "Pat Spencer",
+"salary": [],
+"waived": false
+},
+{
+"name": "Phillip Wheeler",
+"salary": [],
+"waived": false
+},
+{
+"name": "Koby Brea",
+"salary": [],
+"waived": false
+},
+{
+"name": "Bradley Beal",
+"salary": [
+19383010,
+19383010,
+19383010,
+19383010
+],
+"waived": true
+},
+{
+"name": "Nassir Little",
+"salary": [
+3107143,
+3107143,
+3107143
+],
+"waived": true
+},
+{
+"name": "E.J. Liddell",
+"salary": [
+706898
+],
+"waived": true
+}
+],
+"POR": [
+{
+"name": "Ja Morant",
+"salary": [
+42166510,
+44886930
+],
+"waived": false
+},
+{
+"name": "Jrue Holiday",
+"salary": [
+34800000,
+37200000
+],
+"waived": false
+},
+{
+"name": "Shaedon Sharpe",
+"salary": [
+20089287,
+21696429,
+23303571,
+24910713
+],
+"waived": false
+},
+{
+"name": "Toumani Camara",
+"salary": [
+18080358,
+19526786,
+20973214,
+22419642
+],
+"waived": false
+},
+{
+"name": "Robert Williams",
+"salary": [
+13968254,
+14666667,
+15365079
+],
+"waived": false
+},
+{
+"name": "Scoot Henderson",
+"salary": [
+13585523
+],
+"waived": false
+},
+{
+"name": "Damian Lillard",
+"salary": [
+13398800,
+14104000
+],
+"waived": false
+},
+{
+"name": "Deni Avdija",
+"salary": [
+13125000,
+11875000
+],
+"waived": false
+},
+{
+"name": "Donovan Clingan",
+"salary": [
+7519920,
+9550298
+],
+"waived": false
+},
+{
+"name": "Yang Hansen",
+"salary": [
+4643520,
+4864920,
+7462788
+],
+"waived": false
+},
+{
+"name": "Micah Potter",
+"salary": [
+2801346
+],
+"waived": false
+},
+{
+"name": "Vít Krejčí",
+"salary": [
+2667944,
+3005085
+],
+"waived": false
+},
+{
+"name": "Sidy Cissoko",
+"salary": [
+2497812
+],
+"waived": false
+},
+{
+"name": "Jeremy Sochan",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Branden Carlson",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "John Tonje",
+"salary": [],
+"waived": false
+},
+{
+"name": "Didi Louzada",
+"salary": [
+268032,
+268032,
+268032
+],
+"waived": true
+}
+],
+"SAC": [
+{
+"name": "Zach LaVine",
+"salary": [
+48967380
+],
+"waived": false
+},
+{
+"name": "Domantas Sabonis",
+"salary": [
+45472000,
+48608000
+],
+"waived": false
+},
+{
+"name": "De'Andre Hunter",
+"salary": [
+24910714
+],
+"waived": false
+},
+{
+"name": "Keegan Murray",
+"salary": [
+24137936,
+26068965,
+27999999,
+29931033,
+31862067
+],
+"waived": false
+},
+{
+"name": "Malik Monk",
+"salary": [
+20190035,
+21582451
+],
+"waived": false
+},
+{
+"name": "Darius Acuff Jr.",
+"salary": [
+8021640,
+8422920,
+8823600,
+11205972
+],
+"waived": false
+},
+{
+"name": "Precious Achiuwa",
+"salary": [
+5477000,
+5750850
+],
+"waived": false
+},
+{
+"name": "Nique Clifford",
+"salary": [
+3263400,
+3418800,
+5979481
+],
+"waived": false
+},
+{
+"name": "Alex Karaban",
+"salary": [
+2948280,
+3095640,
+3243120,
+5853832
+],
+"waived": false
+},
+{
+"name": "Ben Simmons",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Daeqwon Plowden",
+"salary": [
+2449421,
+2664401
+],
+"waived": false
+},
+{
+"name": "Maxime Raynaud",
+"salary": [
+2150917,
+2525901
+],
+"waived": false
+},
+{
+"name": "Emanuel Sharp",
+"salary": [
+1357763,
+2294370,
+2694363
+],
+"waived": false
+},
+{
+"name": "Jonathan Mogbo",
+"salary": [],
+"waived": false
+},
+{
+"name": "Tristen Newton",
+"salary": [],
+"waived": false
+},
+{
+"name": "Elfrid Payton",
+"salary": [],
+"waived": false
+},
+{
+"name": "Killian Hayes",
+"salary": [],
+"waived": false
+},
+{
+"name": "Adam Flagler",
+"salary": [],
+"waived": false
+},
+{
+"name": "Leaky Black",
+"salary": [],
+"waived": false
+}
+],
+"SAS": [
+{
+"name": "De'Aaron Fox",
+"salary": [
+49800000,
+53784000,
+57768000,
+61752000
+],
+"waived": false
+},
+{
+"name": "Devin Vassell",
+"salary": [
+27000000,
+24652174,
+27000000
+],
+"waived": false
+},
+{
+"name": "Keldon Johnson",
+"salary": [
+17500000
+],
+"waived": false
+},
+{
+"name": "Victor Wembanyama",
+"salary": [
+16868246,
+43500000,
+46980000,
+50460000,
+53940000
+],
+"waived": false
+},
+{
+"name": "Tobias Harris",
+"salary": [
+15044000,
+15796200
+],
+"waived": false
+},
+{
+"name": "Julian Champagnie",
+"salary": [
+13888889,
+15000000,
+16111111
+],
+"waived": false
+},
+{
+"name": "Dylan Harper",
+"salary": [
+12989040,
+13607760,
+17172994
+],
+"waived": false
+},
+{
+"name": "Luke Kornet",
+"salary": [
+10450000,
+9900000,
+9350000
+],
+"waived": false
+},
+{
+"name": "Stephon Castle",
+"salary": [
+10015920,
+12670139
+],
+"waived": false
+},
+{
+"name": "Harrison Barnes",
+"salary": [
+8000000
+],
+"waived": false
+},
+{
+"name": "Carter Bryant",
+"salary": [
+5145360,
+5390640,
+7983539
+],
+"waived": false
+},
+{
+"name": "Jayden Quaintance",
+"salary": [
+3902760,
+4097880,
+4292880,
+6619621
+],
+"waived": false
+},
+{
+"name": "Tarris Reed Jr.",
+"salary": [
+3076920,
+3230520,
+3384480,
+6102218
+],
+"waived": false
+},
+{
+"name": "Jordan McLaughlin",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Taelon Peter",
+"salary": [
+2185116
+],
+"waived": false
+},
+{
+"name": "Malik Williams",
+"salary": [],
+"waived": false
+},
+{
+"name": "David Jones García",
+"salary": [],
+"waived": false
+},
+{
+"name": "Ja'Kobi Gillespie",
+"salary": [],
+"waived": false
+},
+{
+"name": "Jon Elmore",
+"salary": [],
+"waived": false
+},
+{
+"name": "RJ Davis",
+"salary": [],
+"waived": false
+},
+{
+"name": "Maliq Brown",
+"salary": [],
+"waived": false
+}
+],
+"TOR": [
+{
+"name": "Kawhi Leonard",
+"salary": [
+50300000,
+56097561,
+58902439
+],
+"waived": false
+},
+{
+"name": "Scottie Barnes",
+"salary": [
+41754690,
+44847630,
+47940570,
+51033510
+],
+"waived": false
+},
+{
+"name": "Immanuel Quickley",
+"salary": [
+32500000,
+32500000,
+32500000
+],
+"waived": false
+},
+{
+"name": "RJ Barrett",
+"salary": [
+29616071
+],
+"waived": false
+},
+{
+"name": "Jakob Poeltl",
+"salary": [
+19500000,
+27300000,
+29484000,
+27300000
+],
+"waived": false
+},
+{
+"name": "Collin Murray-Boyles",
+"salary": [
+6649560,
+6966000,
+8874684
+],
+"waived": false
+},
+{
+"name": "Allen Graves",
+"salary": [
+4065720,
+4268880,
+4472640,
+6887866
+],
+"waived": false
+},
+{
+"name": "Ja'Kobe Walter",
+"salary": [
+3811800,
+5870172
+],
+"waived": false
+},
+{
+"name": "Kyle Anderson",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Trayce Jackson-Davis",
+"salary": [
+2406205
+],
+"waived": false
+},
+{
+"name": "Jamison Battle",
+"salary": [
+2296271
+],
+"waived": false
+},
+{
+"name": "Jamal Shead",
+"salary": [
+2296271,
+7407407,
+8000000,
+8592593
+],
+"waived": false
+},
+{
+"name": "Alijah Martin",
+"salary": [
+2185116,
+2571895
+],
+"waived": false
+},
+{
+"name": "Jaden Bradley",
+"salary": [
+1357763,
+2294370,
+2694363,
+2918152
+],
+"waived": false
+},
+{
+"name": "Nate Bittle",
+"salary": [
+1357763
+],
+"waived": false
+},
+{
+"name": "Tyson Degenhart",
+"salary": [],
+"waived": false
+},
+{
+"name": "Chucky Hepburn",
+"salary": [],
+"waived": false
+},
+{
+"name": "Trey Jemison",
+"salary": [],
+"waived": false
+},
+{
+"name": "Tyreke Key",
+"salary": [],
+"waived": false
+},
+{
+"name": "Nimari Burnett",
+"salary": [],
+"waived": false
+},
+{
+"name": "Malachi Smith",
+"salary": [],
+"waived": false
+}
+],
+"UTA": [
+{
+"name": "Jaren Jackson Jr.",
+"salary": [
+49000000,
+50500000,
+52000000,
+53500000
+],
+"waived": false
+},
+{
+"name": "Lauri Markkanen",
+"salary": [
+46113154,
+49824681,
+53536209
+],
+"waived": false
+},
+{
+"name": "Josh Green",
+"salary": [
+14679012
+],
+"waived": false
+},
+{
+"name": "Darryn Peterson",
+"salary": [
+13195320,
+13855320,
+14515320,
+18318335
+],
+"waived": false
+},
+{
+"name": "Jusuf Nurkić",
+"salary": [
+10576923,
+11423077
+],
+"waived": false
+},
+{
+"name": "Ace Bailey",
+"salary": [
+9523080,
+9976560,
+12640302
+],
+"waived": false
+},
+{
+"name": "Keyonte George",
+"salary": [
+6563925,
+28700000,
+29848000,
+31041920,
+32283597
+],
+"waived": false
+},
+{
+"name": "Josh Okogie",
+"salary": [
+6000000,
+6000000
+],
+"waived": false
+},
+{
+"name": "Jaxson Hayes",
+"salary": [
+6000000,
+6000000
+],
+"waived": false
+},
+{
+"name": "Brice Sensabaugh",
+"salary": [
+4862237
+],
+"waived": false
+},
+{
+"name": "Svi Mykhailiuk",
+"salary": [
+3850000,
+4025000
+],
+"waived": false
+},
+{
+"name": "Mo Bamba",
+"salary": [
+3286399,
+3681991
+],
+"waived": false
+},
+{
+"name": "Kyle Filipowski",
+"salary": [
+3000000,
+3000000
+],
+"waived": false
+},
+{
+"name": "Isaiah Collier",
+"salary": [
+2763960,
+4988948
+],
+"waived": false
+},
+{
+"name": "Harrison Ingram",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Taylor Funk",
+"salary": [],
+"waived": false
+},
+{
+"name": "Tamar Bates",
+"salary": [],
+"waived": false
+},
+{
+"name": "Trey Alexander",
+"salary": [],
+"waived": false
+},
+{
+"name": "Jonas Aidoo",
+"salary": [],
+"waived": false
+}
+],
+"WAS": [
+{
+"name": "Anthony Davis",
+"salary": [
+58456566,
+62786682
+],
+"waived": false
+},
+{
+"name": "Trae Young",
+"salary": [
+49488300,
+50478066,
+54437130,
+58396194
+],
+"waived": false
+},
+{
+"name": "AJ Dybantsa",
+"salary": [
+14748000,
+15485760,
+16223040,
+20457254
+],
+"waived": false
+},
+{
+"name": "Alex Sarr",
+"salary": [
+12370680,
+15611798
+],
+"waived": false
+},
+{
+"name": "Bilal Coulibaly",
+"salary": [
+9240012
+],
+"waived": false
+},
+{
+"name": "Tre Johnson",
+"salary": [
+8649600,
+9061680,
+11490211
+],
+"waived": false
+},
+{
+"name": "Deandre Ayton",
+"salary": [
+8104000
+],
+"waived": false
+},
+{
+"name": "Tre Mann",
+"salary": [
+8000000,
+8000000
+],
+"waived": false
+},
+{
+"name": "Khris Middleton",
+"salary": [
+5591122,
+5870678,
+6150234
+],
+"waived": false
+},
+{
+"name": "Bub Carrington",
+"salary": [
+4900560,
+7257730
+],
+"waived": false
+},
+{
+"name": "Will Riley",
+"salary": [
+3688320,
+3864000,
+6155352
+],
+"waived": false
+},
+{
+"name": "Kyshawn George",
+"salary": [
+3108000,
+5435892
+],
+"waived": false
+},
+{
+"name": "Justin Champagnie",
+"salary": [
+2667944,
+3005085
+],
+"waived": false
+},
+{
+"name": "Anthony Gill",
+"salary": [
+2449421
+],
+"waived": false
+},
+{
+"name": "Jamir Watkins",
+"salary": [],
+"waived": false
+},
+{
+"name": "Tristan Vukcevic",
+"salary": [],
+"waived": false
+},
+{
+"name": "Trevor Keels",
+"salary": [],
+"waived": false
+},
+{
+"name": "Felix Okpara",
+"salary": [],
+"waived": false
+},
+{
+"name": "Chris Livingston",
+"salary": [],
+"waived": false
+},
+{
+"name": "Skal Labissière",
+"salary": [],
+"waived": false
+},
+{
+"name": "Reece Beekman",
+"salary": [],
+"waived": false
+}
+]
+}
+}

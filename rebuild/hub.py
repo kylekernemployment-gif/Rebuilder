@@ -357,8 +357,8 @@ class HubView(OwnerView):
         elif key == "inbox":
             offers = [o for o in save.get("inbox", []) if not ai.validate(save, ai.Trade.from_dict(o))]
             if offers:
-                page = OffersView(cog, uid, offers, "inbox")
-                embed = offers_embed(save, offers, "📨 Incoming trade offers", "Teams called about your players:")
+                page = OffersView(cog, uid, offers, "inbox", "📨 Incoming trade offers", "Teams called about your players.")
+                embed = page.embed(save)
             else:
                 embed = discord.Embed(title="📨 Offers inbox", description="No open offers. Teams call around the trade deadline.")
         elif key == "shop":
@@ -481,17 +481,19 @@ class HubView(OwnerView):
         await interaction.response.defer()
         save = await self.cog.get_save(self.user_id)
         p = save["players"][pid]
-        offers = await asyncio.to_thread(ai.shop_player, save, pid, 3)
+        offers = await asyncio.to_thread(ai.shop_player, save, pid)
         if not offers:
             self.adopt(None)
             return await self.respond(interaction, discord.Embed(
-                title=f"📞 {p['name']}", description="Nobody is offering real value right now (contract, age or fit)."))
-        dicts = [t.to_dict() for t, _ in offers]
-        page = OffersView(self.cog, self.user_id, dicts, "shop")
+                title=f"📞 {p['name']}", description="Nobody can put together a competitive offer right now "
+                                                      "(his contract, age, or what teams have to give)."))
+        his = ai.player_value(p, "middle", save["season"])
+        dicts = [{**t.to_dict(), "note": ai.offer_note(save, t, w, his)} for t, w in offers]
+        page = OffersView(self.cog, self.user_id, dicts, "shop", f"📞 Offers for {p['name']}",
+                          f"**{p['name']}** ({p['ovr']} OVR, {E.contract_text(p)}) is on the block. "
+                          f"**{len(dicts)} team{'s' if len(dicts) != 1 else ''}** made a real offer, best first.")
         self.adopt(page)
-        await self.respond(interaction, offers_embed(save, dicts, f"📞 Offers for {p['name']}",
-                                                     f"**{p['name']}** ({p['ovr']} OVR, {E.contract_text(p)}) is on the block. "
-                                                     "Best real offers:"))
+        await self.respond(interaction, page.embed(save))
 
     async def start_team(self, interaction: discord.Interaction, abbr: str) -> None:
         cog = self.cog
