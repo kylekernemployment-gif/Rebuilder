@@ -118,7 +118,10 @@ def parse_roster(roster_json: dict, abbr: str, season: int) -> list[dict]:
             "age": int(a.get("age") or 25),
             "exp": int(exp) if isinstance(exp, (int, float)) else 0,
             "salary": sched,
-            "twoway": not sched or sched[0] < 1_150_000,
+            # Two-way only when ESPN lists a tiny salary. No contract data at all usually means ESPN
+            # hasn't loaded a new deal yet (re-signings, extensions), so we estimate it instead.
+            "twoway": bool(sched) and sched[0] < 1_150_000,
+            "est": not sched,
             "inj": inj,
             "jersey": a.get("jersey") or "",
             "headshot": ((a.get("headshot") or {}).get("href") or ""),
@@ -164,6 +167,12 @@ def build_league(rosters: dict[str, list[dict]], stats: dict[int, dict[str, dict
             p["pos"] = _position(p.pop("espn_pos", ""), last)
             players[p["id"]] = p
     rate_league(players, season)
+    from .ai import market_salary
+    for p in players.values():
+        if p.get("est"):
+            amt = int(round(market_salary(p["ovr"], season), -5))
+            yrs = 4 if p["age"] <= 26 else 3 if p["age"] <= 30 else 2
+            p["salary"] = [int(amt * 1.05 ** i) for i in range(yrs)]
     return {
         "season": season,
         "fetched": int(time.time()),

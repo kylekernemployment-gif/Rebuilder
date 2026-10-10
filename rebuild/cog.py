@@ -529,7 +529,7 @@ class Rebuild(commands.Cog):
     async def cog_load(self) -> None:
         await self.store.init()
         self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=40))
-        cached = await self.store.get_cache("live_league")
+        cached = await self.store.get_cache("live_league_v2")
         if cached:
             try:
                 self.live = L.unpack(cached[0])
@@ -561,7 +561,7 @@ class Rebuild(commands.Cog):
                 if live:
                     self.live = live
                     self.feed.set_players(live["players"])
-                    await self.store.put_cache("live_league", L.pack(live))
+                    await self.store.put_cache("live_league_v2", L.pack(live))
                 self.last_league = now if live else now - LEAGUE_REFRESH_SECS + 300
             except Exception:
                 log.exception("League refresh failed")

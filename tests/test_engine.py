@@ -148,3 +148,16 @@ def test_full_seasons_stay_sane(live):
         top = sorted((p["ovr"] for p in s["players"].values() if p.get("team")), reverse=True)
         assert top[0] <= 99 and top[10] < 97
     assert len(L.pack(s)) < 400_000
+
+
+def test_missing_contract_is_estimated_not_two_way():
+    from rebuild.data import build_league
+    roster = {"athletes": [{"id": "9", "displayName": "Jalen Duren", "age": 22, "position": {"abbreviation": "C"},
+                            "contracts": [{"salary": 4_500_000, "season": {"year": 2026}}]}]}
+    p = parse_roster(roster, "DET", 2027)[0]
+    assert not p["twoway"] and p["est"]
+    stats = {2026: {"9": {"gp": 78, "mpg": 30, "pts": 12, "reb": 10, "ast": 2, "blk": 1, "stl": 0.7,
+                          "fgm": 5, "fga": 7.5, "ftm": 2, "fta": 3, "tov": 1.5, "pf": 3}}}
+    lg = build_league({"DET": [p]}, stats, 2027)
+    q = lg["players"]["9"]
+    assert q["salary"] and q["salary"][0] > 2_000_000 and len(q["salary"]) == 4

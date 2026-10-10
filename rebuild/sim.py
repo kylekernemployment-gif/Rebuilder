@@ -129,6 +129,7 @@ def ensure_rosters(save: dict, rng: random.Random) -> None:
                 save["players"][p["id"]] = p
                 save["fa"].append(p["id"])
             p["salary"] = [cba.MIN_SALARY]
+            p.pop("est", None)
             p.pop("twoway", None)
             L.move_player(save, p["id"], abbr)
 
@@ -553,6 +554,7 @@ def resign(save: dict, pid: str) -> str:
     p = save["players"][pid]
     ask = save["asks"].pop(pid)
     p["salary"] = [int(ask["amount"] * (1.05 ** i)) for i in range(ask["years"])]
+    p.pop("est", None)
     p["expiring"] = False
     return f"✍️ Re-signed {p['name']}: {ask['years']} yrs, {cba.money(sum(p['salary']))} total"
 
@@ -582,6 +584,7 @@ def ai_resign(save: dict, rng: random.Random) -> None:
                 keep = False
             if keep:
                 p["salary"] = [int(ask["amount"] * (1.05 ** i)) for i in range(ask["years"])]
+                p.pop("est", None)
                 p["expiring"] = False
             else:
                 L.move_player(save, p["id"], None)
@@ -599,6 +602,7 @@ def start_free_agency(save: dict, rng: random.Random) -> None:
     for pid in save["fa"]:
         p = save["players"][pid]
         p["salary"] = []
+        p.pop("est", None)
         p.pop("twoway", None)
     save["fa_asks"] = {pid: asking(save, save["players"][pid]) for pid in save["fa"]}
     save["phase"] = "fa"
@@ -650,6 +654,7 @@ def sign_fa(save: dict, pid: str) -> str:
     if "minimum" in how:
         yrs = min(yrs, 2)
     p["salary"] = [int(amt * (1.05 ** i)) for i in range(yrs)]
+    p.pop("est", None)
     save["fa_asks"].pop(pid, None)
     L.move_player(save, pid, save["team"])
     p["acq"] = save["season"] + 1
@@ -688,6 +693,7 @@ def ai_free_agency(save: dict, rng: random.Random) -> list[str]:
             if how == "mle":
                 used_mle.add(team)
             p["salary"] = [int(amt * (1.05 ** i)) for i in range(ask["years"] if how != "min" else 1)]
+            p.pop("est", None)
             L.move_player(save, pid, team)
             if p["ovr"] >= 78:
                 news.append(f"✍️ {p['name']} signs with the {cba.TEAMS[team].name} ({ask['years']} yrs, {cba.money(sum(p['salary']))})")

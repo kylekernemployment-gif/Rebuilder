@@ -77,6 +77,8 @@ def production(p: dict, season: int) -> float:
         den += w
     prior_w = 14.0
     prior = salary_impact(p, season)
+    if not p.get("salary"):  # contract unknown: lean on the stats instead
+        prior, prior_w = 8.0, 5.0
     if p.get("exp", 0) <= 1 and den < 30:
         prior += 1.0  # rookies: draft slot salary undersells them a bit
     return (num + prior * prior_w) / (den + prior_w)

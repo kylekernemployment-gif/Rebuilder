@@ -42,6 +42,8 @@ def contract_text(p: dict) -> str:
         return "two-way"
     if not sal:
         return "unsigned"
+    if p.get("est"):
+        return f"~{cba.money(sal[0])} ×{len(sal)} (est.)"
     return f"{cba.money(sal[0])} ×{len(sal)}"
 
 
@@ -114,8 +116,9 @@ def player_embed(save: dict, p: dict) -> discord.Embed:
         yrs = " → ".join(f"{cba.season_label(save['season'] + i + (1 if save['phase'] in ('draft', 'resign', 'fa') else 0))[-5:]}: "
                          f"{cba.money(s)}" for i, s in enumerate(sal))
         mkt = ai.market_salary(p["ovr"], save["season"])
+        est = "\n_Estimated: ESPN hasn't posted the terms of this deal yet._" if p.get("est") else ""
         e.add_field(name=f"Contract · {cba.money(sum(sal))} total",
-                    value=f"{yrs}\nMarket value at his level: ~{cba.money(mkt)}/yr", inline=False)
+                    value=f"{yrs}\nMarket value at his level: ~{cba.money(mkt)}/yr{est}", inline=False)
     if team and team != save["team"]:
         rel = ai.reluctance(save, team, p)
         stance = ("🚫 Untouchable" if rel >= ai.UNTOUCHABLE else "😬 Very reluctant" if rel >= 0.4 else
