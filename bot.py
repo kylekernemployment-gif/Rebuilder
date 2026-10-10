@@ -45,18 +45,23 @@ class RebuildBot(commands.Bot):
     def __init__(self) -> None:
         super().__init__(command_prefix="!", intents=discord.Intents.default(), help_command=None)
         self.last_ping = 0.0
+        self.synced: set[int] = set()
 
     async def setup_hook(self) -> None:
-        guild = discord.Object(id=int(GUILD_ID)) if GUILD_ID.isdigit() else None
-        await self.add_cog(Rebuild(self, _database_url(), os.getenv("DB_PATH", "rebuild.db")),
-                           **({"guild": guild} if guild else {}))
-        try:
-            synced = await self.tree.sync(guild=guild)
-            log.info("Synced %d slash command group(s)%s", len(synced), " to your server" if guild else " globally")
-        except discord.Forbidden:
-            log.error("Couldn't register slash commands. Re-invite the bot with the 'bot' AND "
-                      "'applications.commands' scopes, and check GUILD_ID is your server ID.")
+        await self.add_cog(Rebuild(self, _database_url(), os.getenv("DB_PATH", "rebuild.db")))
         self.keep_awake.start()
+
+    async def sync_to(self, guild: discord.abc.Snowflake, name: str = "") -> None:
+        """Register the slash commands in one server (shows up instantly, unlike global sync)."""
+        try:
+            self.tree.copy_global_to(guild=guild)
+            synced = await self.tree.sync(guild=guild)
+            log.info("Synced %d slash command group(s) to server %s %s", len(synced), guild.id, name)
+        except discord.Forbidden:
+            log.error("Couldn't register slash commands in server %s %s. Re-invite the bot with BOTH the 'bot' "
+                      "and 'applications.commands' scopes checked.", guild.id, name)
+        except discord.HTTPException as e:
+            log.error("Slash command sync failed in server %s: %r", guild.id, e)
 
     @tasks.loop(minutes=5)
     async def keep_awake(self) -> None:
@@ -72,7 +77,19 @@ class RebuildBot(commands.Bot):
             log.debug("Self-ping failed: %r", e)
 
     async def on_ready(self) -> None:
-        log.info("Logged in as %s (%s)", self.user, self.user.id)
+        log.info("Logged in as %s (%s), in %d server(s)", self.user, self.user.id, len(self.guilds))
+        if not self.guilds:
+            log.error("The bot isn't in any server yet. Open the invite link from the Developer Portal "
+                      "(OAuth2 > URL Generator, scopes 'bot' + 'applications.commands') and add it to your server.")
+        for g in self.guilds:
+            if g.id not in self.synced:  # on_ready fires again on reconnects
+                await self.sync_to(g, f"({g.name})")
+                self.synced.add(g.id)
+        if GUILD_ID.isdigit() and int(GUILD_ID) not in {g.id for g in self.guilds}:
+            log.warning("GUILD_ID %s isn't a server this bot is in. Commands were registered in the servers above.", GUILD_ID)
+
+    async def on_guild_join(self, guild: discord.Guild) -> None:
+        await self.sync_to(guild, f"({guild.name})")
 
 
 async def start_web_server() -> None:
