@@ -172,11 +172,29 @@ def load_payrolls(live: dict[str, dict[str, dict]] | None = None) -> dict[str, l
     except (OSError, ValueError, KeyError):
         snap = {}
     out = {abbr: list(rows) for abbr, rows in snap.items() if abbr in cba.TEAMS}
+    rejected = []
     for abbr, rows in (live or {}).items():
-        if abbr in cba.TEAMS and len(rows) >= 10:
-            out[abbr] = [{"name": r["name"], "salary": r["salary"], "waived": r.get("waived", False)}
-                         for r in rows.values()]
+        if abbr not in cba.TEAMS:
+            continue
+        rows = [{"name": r["name"], "salary": r["salary"], "waived": r.get("waived", False)} for r in rows.values()]
+        if _payroll_looks_right(rows, out.get(abbr)):
+            out[abbr] = rows
+        else:
+            rejected.append(abbr)
+    if rejected:
+        log.warning("Live payrolls for %s didn't look complete; using the bundled snapshot for them", ", ".join(rejected))
     return out
+
+
+def _payroll_looks_right(rows: list[dict], snap: list[dict] | None) -> bool:
+    """A live payroll page only replaces the snapshot if it lists a full roster and most of the
+    players the snapshot has under contract. A half-parsed page would otherwise empty a team."""
+    from .sources import name_key
+    signed = {name_key(r["name"]) for r in rows if r.get("salary") and not r.get("waived")}
+    if len(signed) < 12:
+        return False
+    before = {name_key(r["name"]) for r in snap or [] if r.get("salary") and not r.get("waived")}
+    return not before or len(signed & before) >= 0.7 * len(before)
 
 
 def _reconcile(players: dict[str, dict], payrolls: dict[str, list[dict]], meta: dict | None) -> dict[str, int]:
@@ -249,9 +267,18 @@ def _reconcile(players: dict[str, dict], payrolls: dict[str, list[dict]], meta: 
     # A team's payroll is the source of truth for who is on it, so anyone ESPN still lists there
     # (unsigned vets, waived players, stale contracts) becomes a free agent. On a team with no
     # payroll data, only ESPN-only players without a real deal are released.
+    # Safety net: if a team's payroll matched fewer than 13 real contracts, its data is suspect, so
+    # nobody with a real ESPN contract is released from that team.
+    signed = {}
+    for p in players.values():
+        if p["id"] in claimed and not p.get("twoway"):
+            signed[p["team"]] = signed.get(p["team"], 0) + 1
+    thin = {a for a in payrolls if signed.get(a, 0) < cba.ROSTER_MIN}
+    if thin:
+        log.warning("Payrolls matched too few contracts for %s; keeping ESPN's roster there", ", ".join(sorted(thin)))
     for p in players.values():
         if p.get("team") and p["id"] not in claimed and (
-                p["team"] in payrolls or p.get("est") or p.get("twoway")):
+                (p["team"] in payrolls and p["team"] not in thin) or p.get("est") or p.get("twoway")):
             p["team"] = None
             p["salary"] = []
             p["twoway"] = False

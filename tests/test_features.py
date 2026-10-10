@@ -220,3 +220,26 @@ def test_stale_buttons_never_replay_a_season_step(tmp_path):
         assert all(save["players"][pid]["age"] == a for pid, a in ages.items() if pid in save["players"])
 
     asyncio.run(flow())
+
+
+def test_a_broken_live_payroll_page_cant_empty_a_team():
+    """If Basketball-Reference serves a page we only half-parse, the team keeps the bundled
+    snapshot instead of releasing most of its roster."""
+    import json
+    from pathlib import Path
+    from rebuild.data import build_league, load_payrolls, parse_roster
+    snap = json.loads((Path(L.__file__).parent / "data" / "contracts_snapshot.json").read_text())["teams"]
+    det = [r for r in snap["DET"] if r["salary"] and not r.get("waived")]
+    # live page with only a few real players plus junk rows
+    broken = {f"x{i}": {"name": f"Cap Hold {i}", "salary": [1_000_000]} for i in range(10)}
+    broken.update({r["name"]: {"name": r["name"], "salary": r["salary"]} for r in det[:3]})
+    pay = load_payrolls({"DET": broken})
+    assert {r["name"] for r in pay["DET"]} == {r["name"] for r in snap["DET"]}
+    # and even with bad payroll data, players with real ESPN contracts stay put
+    athletes = [{"id": str(i), "displayName": r["name"], "age": 27, "position": {"abbreviation": "SF"},
+                 "contract": {"salary": r["salary"][0], "yearsRemaining": len(r["salary"])}} for i, r in enumerate(det)]
+    rosters = {a: [] for a in cba.TEAMS}
+    rosters["DET"] = parse_roster({"athletes": athletes}, "DET", 2027)
+    stats = {2026: {str(i): {"gp": 60, "mpg": 25, "pts": 12} for i in range(len(det))}}
+    lg = build_league(rosters, stats, 2027)
+    assert sum(1 for p in lg["players"].values() if p["team"] == "DET" and not p.get("twoway")) >= 13
